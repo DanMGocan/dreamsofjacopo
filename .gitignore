@@ -5,3 +5,7 @@
 
 # Ignore PPTX files
 presentation.pptx
+pdfs/
+ppts/
+
+data_conversion.csv
