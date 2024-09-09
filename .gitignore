@@ -1,0 +1,7 @@
+# Ignore Python virtual environment and cache
+.venv/
+**/__pycache__/
+**/temp/
+
+# Ignore PPTX files
+presentation.pptx
