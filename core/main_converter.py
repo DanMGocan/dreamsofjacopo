@@ -75,6 +75,8 @@ def convert_pdf_to_images(pdf_path, output_dir):
     except Exception as e:
         raise Exception(f"Unexpected error: {e}")
 
+
+
 # Main conversion function (if needed)
 def convert_pptx(input_pptx):
     try:
