@@ -24,3 +24,7 @@ Move all the passwords to a .env file once in production
 Must make sure unique names are created for the .pptx file
 Different formats might require different upload forms 
 Check for number of slides and size
+
+Add Azure integration
+
+Should we make images available as full .pdfs to downloads? 

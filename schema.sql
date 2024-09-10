@@ -1,32 +1,46 @@
--- Drop existing tables if they exist
-DROP TABLE IF EXISTS posts;
-DROP TABLE IF EXISTS users;
+CREATE DATABASE IF NOT EXISTS dreamsofjacopo;
+USE dreamsofjacopo;
 
--- Create the users table
-CREATE TABLE IF NOT EXISTS users (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    email VARCHAR(100) NOT NULL UNIQUE
+-- User Table
+CREATE TABLE user (
+    user_id INT AUTO_INCREMENT PRIMARY KEY,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    premium_status BOOLEAN DEFAULT FALSE,
+    member_since DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
--- Insert dummy rows into the users table
-INSERT INTO users (name, email) VALUES 
-('John Doe', 'john.doe@example.com'),
-('Jane Smith', 'jane.smith@example.com'),
-('Alice Johnson', 'alice.johnson@example.com');
-
--- Create the posts table
-CREATE TABLE IF NOT EXISTS posts (
-    id INT AUTO_INCREMENT PRIMARY KEY,
+-- PDF Table
+CREATE TABLE pdf (
+    pdf_id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
-    content TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id)
+    url VARCHAR(255) NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE
 );
 
--- Insert dummy rows into the posts table
-INSERT INTO posts (user_id, content) VALUES 
-(1, 'This is John Doe''s first post'),
-(2, 'Jane Smith sharing an update'),
-(3, 'Alice Johnson says hello'),
-(1, 'John Doe again with more content');
+-- Image Table
+CREATE TABLE image (
+    image_id INT AUTO_INCREMENT PRIMARY KEY,
+    pdf_id INT,
+    url VARCHAR(255) NOT NULL,
+    uploaded_on DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (pdf_id) REFERENCES pdf(pdf_id) ON DELETE CASCADE
+);
+
+-- Set Table
+CREATE TABLE `set` (
+    set_id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255),
+    qrcode_url VARCHAR(255) NOT NULL,
+    user_id INT,
+    FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE
+);
+
+-- Images_per_set Table (Join Table)
+CREATE TABLE images_per_set (
+    set_id INT,
+    image_id INT,
+    PRIMARY KEY (set_id, image_id),
+    FOREIGN KEY (set_id) REFERENCES `set`(set_id) ON DELETE CASCADE,
+    FOREIGN KEY (image_id) REFERENCES image(image_id) ON DELETE CASCADE
+);

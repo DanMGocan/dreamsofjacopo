@@ -1,6 +1,6 @@
 from fastapi import APIRouter, UploadFile, File, Request
 import os
-from core import main_converter  # Assuming your converter functions are here
+from core import main_converter  
 from fastapi.templating import Jinja2Templates
 
 TEMP_DIR = "static/temp/"
