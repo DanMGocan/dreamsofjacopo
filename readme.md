@@ -28,3 +28,8 @@ Check for number of slides and size
 Add Azure integration
 
 Should we make images available as full .pdfs to downloads?
+
+Should I use a queue system like Celery to queue tasks and send notifications to user when they can download their set? 
+Should I use Celety for background conversion 
+
+Database and VM backup 
