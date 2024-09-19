@@ -1,5 +1,5 @@
-CREATE DATABASE IF NOT EXISTS dreamsofjacopo;
-USE dreamsofjacopo;
+CREATE DATABASE IF NOT EXISTS slidepull_main;
+USE slidepull_main;
 
 -- User Table
 CREATE TABLE user (
