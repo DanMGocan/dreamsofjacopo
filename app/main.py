@@ -1,9 +1,9 @@
-from fastapi import FastAPI, UploadFile, File, Request
+from fastapi import FastAPI, UploadFile, File, Request, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
+from core.session import get_current_user
 
-import shutil
 import os
 from api import converter, users, qrcode
 
@@ -21,11 +21,12 @@ app.include_router(qrcode.qrcode)
 # Initialize templates
 templates = Jinja2Templates(directory="templates")
 
-# To debug current location
-print(f"Current working directory: {os.getcwd()}")
-
 @app.get("/", response_class=HTMLResponse)
 async def upload_form(request: Request):
-    """Serve the HTML form for uploading .pptx files"""
     return templates.TemplateResponse("/home.html", {"request": request})
+
+# Protected route example
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request, current_user=Depends(get_current_user)):
+    return templates.TemplateResponse("dashboard.html", {"request": request, "user": current_user})
 

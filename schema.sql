@@ -7,7 +7,8 @@ CREATE TABLE user (
     email VARCHAR(255) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
     premium_status BOOLEAN DEFAULT FALSE,
-    member_since DATETIME DEFAULT CURRENT_TIMESTAMP
+    member_since DATETIME DEFAULT CURRENT_TIMESTAMP,
+    account_activated BOOLEAN DEFAULT FALSE
 );
 
 -- PDF Table
