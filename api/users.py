@@ -8,6 +8,7 @@ from helpers.activation import generate_activation_token, verify_activation_toke
 import mysql.connector
 from itsdangerous.exc import BadSignature, SignatureExpired
 from itsdangerous import URLSafeTimedSerializer, URLSafeSerializer
+from helpers.email_utils import send_activation_email
 
 import os
 
@@ -80,6 +81,8 @@ async def create_account(request: Request, background_tasks: BackgroundTasks):
 async def show_login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
 
+
+
 @users.post("/login")
 async def login(request: Request):
     form = await request.form()
@@ -114,12 +117,16 @@ async def login(request: Request):
     except mysql.connector.Error as e:
         raise HTTPException(status_code=500, detail="Database error")
 
+
+
 # Route to handle logout
 @users.get("/logout")
 async def logout(request: Request):
     response = RedirectResponse(url="/login", status_code=303)
     clear_session(response)
     return response
+
+
 
 # Activation endpoint
 @users.get("/activate-account/{token}")
@@ -148,4 +155,42 @@ async def activate_account(request: Request, token: str):
     except mysql.connector.Error as e:
         cursor.close()
         db.close()
+        raise HTTPException(status_code=500, detail="Database error")
+    
+
+
+@users.get("/resend-activation", response_class=HTMLResponse)
+async def show_resend_activation_page(request: Request):
+    return templates.TemplateResponse("resend_activation.html", {"request": request})
+
+@users.post("/resend-activation")
+async def resend_activation(request: Request, background_tasks: BackgroundTasks):
+    form = await request.form()
+    email = form.get("email")
+
+    if not email:
+        raise HTTPException(status_code=400, detail="Email is required")
+
+    db = get_db()
+    if db is None:
+        raise HTTPException(status_code=500, detail="Database connection error")
+
+    try:
+        cursor = db.cursor(dictionary=True)
+        query = "SELECT user_id, account_activated FROM user WHERE email = %s"
+        cursor.execute(query, (email,))
+        user = cursor.fetchone()
+        cursor.close()
+        db.close()
+
+        if user:
+            if user['account_activated']:
+                return templates.TemplateResponse("activation_failed.html", {"request": request, "message": "Account is already activated."})
+            else:
+                token = serializer.dumps(user['user_id'], salt='activate-account')
+                background_tasks.add_task(send_activation_email, email, token)
+                return templates.TemplateResponse("activation_sent.html", {"request": request, "email": email})
+        else:
+            return templates.TemplateResponse("activation_failed.html", {"request": request, "message": "Email not found."})
+    except mysql.connector.Error as e:
         raise HTTPException(status_code=500, detail="Database error")

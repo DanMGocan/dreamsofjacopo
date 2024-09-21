@@ -1,18 +1,75 @@
 # app/email_utils.py
+from fastapi import Request
 
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import os
+from dotenv import load_dotenv
 
-SMTP_SERVER = os.getenv('SMTP_SERVER', 'smtp.gmail.com')
-SMTP_PORT = int(os.getenv('SMTP_PORT', '587'))
-SMTP_USERNAME = os.getenv('SMTP_USERNAME')
-SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
-EMAIL_FROM = os.getenv('EMAIL_FROM', SMTP_USERNAME)
-BASE_URL = os.getenv('BASE_URL', 'http://localhost:8000')  # Update with your domain
+
+import base64
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.discovery import build
+
+# Load environment variables from the .env file
+load_dotenv()
+
+# Google OAuth variables from .env file
+GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
+GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET')
+GOOGLE_PROJECT_ID = os.getenv('GOOGLE_PROJECT_ID')
+GOOGLE_AUTH_URI = os.getenv('GOOGLE_AUTH_URI')
+GOOGLE_TOKEN_URI = os.getenv('GOOGLE_TOKEN_URI')
+GOOGLE_AUTH_PROVIDER_CERT_URL = os.getenv('GOOGLE_AUTH_PROVIDER_CERT_URL')
+GOOGLE_REDIRECT_URIS = os.getenv('GOOGLE_REDIRECT_URIS').split(',')
+
+# Create a dictionary to mimic the structure of the previous gsecret.json
+GOOGLE_CREDENTIALS = {
+    "web": {
+        "client_id": GOOGLE_CLIENT_ID,
+        "project_id": GOOGLE_PROJECT_ID,
+        "auth_uri": GOOGLE_AUTH_URI,
+        "token_uri": GOOGLE_TOKEN_URI,
+        "auth_provider_x509_cert_url": GOOGLE_AUTH_PROVIDER_CERT_URL,
+        "client_secret": GOOGLE_CLIENT_SECRET,
+        "redirect_uris": GOOGLE_REDIRECT_URIS,
+    }
+}
+
+# Scopes required to send emails
+SCOPES = ['https://www.googleapis.com/auth/gmail.send']
+
+# Example of how to use these credentials when initializing the InstalledAppFlow
+from google_auth_oauthlib.flow import InstalledAppFlow
+
+def get_gmail_service():
+    creds = None
+    token_file = 'token.json'
+
+    # Load existing credentials from token file
+    if os.path.exists(token_file):
+        creds = Credentials.from_authorized_user_file(token_file, SCOPES)
+
+    # If no valid credentials are available, initiate the OAuth flow
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            # Use the credentials dictionary instead of a JSON file
+            flow = InstalledAppFlow.from_client_config(GOOGLE_CREDENTIALS, SCOPES)
+            creds = flow.run_local_server(port=8080)
+
+        # Save the credentials for future use
+        with open(token_file, 'w') as token:
+            token.write(creds.to_json())
+
+    service = build('gmail', 'v1', credentials=creds)
+    return service
 
 def send_activation_email(email_to, token):
+    BASE_URL = os.getenv('BASE_URL', 'http://localhost:8000')
     activation_link = f"{BASE_URL}/activate-account/{token}"
     subject = "Activate Your Account"
     body = f"""
@@ -22,27 +79,19 @@ def send_activation_email(email_to, token):
     <p>If you did not register on our site, please ignore this email.</p>
     """
 
-    # Create message container
-    msg = MIMEMultipart('alternative')
-    msg['Subject'] = subject
-    msg['From'] = EMAIL_FROM
-    msg['To'] = email_to
+    # Create the email message
+    message = MIMEText(body, 'html')
+    message['to'] = email_to
+    message['subject'] = subject
 
-    # Record the MIME types of both parts - text/plain and text/html.
-    part = MIMEText(body, 'html')
-
-    # Attach parts into message container.
-    msg.attach(part)
+    # Encode the message
+    raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode()
 
     try:
-        # Establish connection to the SMTP server
-        server = smtplib.SMTP(SMTP_SERVER, SMTP_PORT)
-        server.starttls()
-        server.login(SMTP_USERNAME, SMTP_PASSWORD)
-
-        # Send the email
-        server.sendmail(EMAIL_FROM, email_to, msg.as_string())
-        server.quit()
+        service = get_gmail_service()
+        send_message = {'raw': raw_message}
+        service.users().messages().send(userId='me', body=send_message).execute()
         print(f"Activation email sent to {email_to}")
     except Exception as e:
         print(f"Error sending activation email: {e}")
+
