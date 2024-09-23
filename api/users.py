@@ -8,6 +8,7 @@ from itsdangerous.exc import BadSignature, SignatureExpired
 from itsdangerous import URLSafeSerializer
 from helpers.email_utils import send_activation_email
 from helpers.flash_utils import set_flash_message
+from helpers.pass_utility import generate_password
 from authlib.integrations.starlette_client import OAuth
 from starlette.config import Config
 
@@ -37,21 +38,6 @@ oauth.register(
     server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
     client_kwargs={
         'scope': 'openid email',
-    }
-)
-
-# Microsoft OAuth configuration
-oauth.register(
-    name='microsoft',
-    client_id=os.getenv('MICROSOFT_CLIENT_ID'),
-    client_secret=os.getenv('MICROSOFT_CLIENT_SECRET'),
-    authorize_url='https://login.microsoftonline.com/common/oauth2/v2.0/authorize',
-    authorize_params=None,
-    access_token_url='https://login.microsoftonline.com/common/oauth2/v2.0/token',
-    access_token_params=None,
-    refresh_token_url=None,
-    client_kwargs={
-        'scope': 'openid email profile User.Read',
     }
 )
 
@@ -161,7 +147,6 @@ async def login(request: Request):
     except mysql.connector.Error as e:
         raise HTTPException(status_code=500, detail="Database error")
 
-
 # Google Login Endpoint
 @users.get("/login/google")
 async def login_via_google(request: Request):
@@ -198,7 +183,7 @@ async def google_auth_callback(request: Request):
                 INSERT INTO user (email, password, account_activated, login_method)
                 VALUES (%s, %s, %s, %s)
             """
-            cursor.execute(insert_query, (email, os.getenv('PLACEHOLDER_PASSWORD'), True, 'google'))  # Set login_method to google
+            cursor.execute(insert_query, (email, generate_password(), True, 'google'))  # Set login_method to google
             db.commit()
             user_id = cursor.lastrowid  # Get the inserted user ID
             account_activated = True
@@ -209,69 +194,6 @@ async def google_auth_callback(request: Request):
 
             # Check if the user registered with a different method
             if user['login_method'] != 'google':
-                raise HTTPException(status_code=403, detail="You registered with a different login method. Please use that method to log in.")
-
-        cursor.close()
-        db.close()
-
-        # Store user info in the session
-        request.session['user_id'] = user_id
-        request.session['email'] = email
-        request.session['account_activated'] = account_activated
-
-        # Redirect to the dashboard
-        return RedirectResponse(url="/dashboard", status_code=303)
-
-    except mysql.connector.Error as e:
-        raise HTTPException(status_code=500, detail="Database error")
-
-# Microsoft Login Endpoint
-@users.get("/login/microsoft")
-async def login_via_microsoft(request: Request):
-    redirect_uri = config("MICROSOFT_REDIRECT_URI")
-    return await oauth.microsoft.authorize_redirect(request, redirect_uri)
-
-# Microsoft Callback Endpoint
-@users.get("/auth/microsoft/callback")
-async def microsoft_auth_callback(request: Request):
-    # Fetch the token from the authorization callback
-    token = await oauth.microsoft.authorize_access_token(request)
-    userinfo = await oauth.microsoft.parse_id_token(request, token)
-
-    # Extract the user's email and other information
-    email = userinfo.get('email', userinfo.get('preferred_username'))
-    microsoft_user_id = userinfo.get('sub')
-
-    # Open a database connection
-    db = get_db()
-    if db is None:
-        raise HTTPException(status_code=500, detail="Database connection error")
-
-    try:
-        cursor = db.cursor(dictionary=True)
-
-        # Check if the user already exists in the database
-        query = "SELECT user_id, email, account_activated, login_method FROM user WHERE email = %s"
-        cursor.execute(query, (email,))
-        user = cursor.fetchone()
-
-        # If the user does not exist, add them to the database
-        if not user:
-            insert_query = """
-                INSERT INTO user (email, password, account_activated, login_method)
-                VALUES (%s, %s, %s, %s)
-            """
-            cursor.execute(insert_query, (email, 'oauth_user_no_password', True, 'microsoft'))  # Placeholder password, set login_method to 'microsoft'
-            db.commit()
-            user_id = cursor.lastrowid  # Get the inserted user ID
-            account_activated = True
-        else:
-            # User already exists, get their user_id and activation status
-            user_id = user['user_id']
-            account_activated = user['account_activated']
-
-            # Ensure the user registered via Microsoft
-            if user['login_method'] != 'microsoft':
                 raise HTTPException(status_code=403, detail="You registered with a different login method. Please use that method to log in.")
 
         cursor.close()
