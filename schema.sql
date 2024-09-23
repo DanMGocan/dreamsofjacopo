@@ -8,7 +8,8 @@ CREATE TABLE user (
     password VARCHAR(255) NOT NULL,
     premium_status BOOLEAN DEFAULT FALSE,
     member_since DATETIME DEFAULT CURRENT_TIMESTAMP,
-    account_activated BOOLEAN DEFAULT FALSE
+    account_activated BOOLEAN DEFAULT FALSE,
+    login_method ENUM("slide_pull", "google", "microsoft") NOT NULL
 );
 
 -- PDF Table

@@ -5,8 +5,25 @@
     <title>Dashboard</title>
 </head>
 <body>
-    <h1>Welcome, {{ user.email }}</h1>
-    <p>Your user ID is {{ user.user_id }}</p>
+    <h1>Welcome, {{ email }}</h1>
+    <p>Your user ID is {{ user_id }}</p>
+
+    {% if flash_message %}
+        <div style="color: green;">
+            <p>{{ flash_message }}</p>
+        </div>
+    {% endif %}
+
+    {% if not account_activated %}
+        <div style="color: red;">
+            <p><strong>Warning:</strong> Your account is not activated. Please check your email for the activation link or 
+               <form action="/resend-activation" method="POST">
+                   <button type="submit">Click here</button> to resend the activation email.
+               </form>
+            </p>
+        </div>
+    {% endif %}
+
     <a href="/logout">Logout</a>
 </body>
 </html>

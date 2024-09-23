@@ -8,9 +8,27 @@
 <body>
     <a href="/upload">Upload .pptx</a><br>
     <a href="/registration">Register for new account</a><br>
-    <a href="/generateqr">Generate QR code</a>
+    <a href="/generateqr">Generate QR code</a><br>
 
-    <p>Requestion information</p>
-    <p> {{ request.body }}
+    <p>Login with:</p>
+
+    <form action="/login" method="post">
+        <label for="email">Email:</label>
+        <input type="email" name="email" id="email" required>
+        <br><br>
+
+        <label for="password">Password:</label>
+        <input type="password" name="password" id="password" required>
+        <br><br>
+
+        <button type="submit">Login</button>
+    </form>
+
+    <!-- Google Login (GET request) -->
+    <a href="/login/google">Login with Google</a><br>
+
+    <!-- Microsoft Login (GET request) -->
+    <a href="/login/microsoft">Login with Microsoft</a><br>
+
 </body>
 </html>
