@@ -33,3 +33,9 @@ Should I use a queue system like Celery to queue tasks and send notifications to
 Should I use Celety for background conversion 
 
 Database and VM backup 
+
+This is a common problem when:
+
+The application does not verify authorization beyond authentication (i.e., the user is logged in but not restricted to their own data).
+The API relies solely on the client to provide resource identifiers, which can be easily manipulated.
+Make sure that access to resources is conditioned by the owner_id matching the owner of the resource id. 
