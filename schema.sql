@@ -9,7 +9,9 @@ CREATE TABLE user (
     premium_status BOOLEAN DEFAULT FALSE,
     member_since DATETIME DEFAULT CURRENT_TIMESTAMP,
     account_activated BOOLEAN DEFAULT FALSE,
-    login_method ENUM("slide_pull", "google", "microsoft") NOT NULL
+    login_method ENUM("slide_pull", "google", "microsoft") NOT NULL,
+    alias VARCHAR(255) NOT NULL UNIQUE
+
 );
 
 -- PDF Table

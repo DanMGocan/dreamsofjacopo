@@ -11,11 +11,14 @@ from helpers.flash_utils import set_flash_message
 from helpers.pass_utility import generate_password
 from authlib.integrations.starlette_client import OAuth
 from starlette.config import Config
+import uuid
 
 import os
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key')  # Ensure to set this in your .env file
 serializer = URLSafeSerializer(SECRET_KEY)
+alias = str(uuid.uuid4())
+
 
 users = APIRouter()
 
@@ -68,10 +71,10 @@ async def create_account(request: Request, background_tasks: BackgroundTasks):
 
         # Insert user with login_method as 'slide_pull' for traditional email/password signup
         insert_query = """
-            INSERT INTO user (email, password, account_activated, login_method)
-            VALUES (%s, %s, %s, %s)
+            INSERT INTO user (email, password, account_activated, login_method, alias)
+            VALUES (%s, %s, %s, %s, %s)
         """
-        cursor.execute(insert_query, (email, hashed_password, False, 'slide_pull'))  # Set account_activated to False and login_method to 'slide_pull'
+        cursor.execute(insert_query, (email, hashed_password, False, 'slide_pull', alias))  # Set account_activated to False and login_method to 'slide_pull'
         db.commit()
         user_id = cursor.lastrowid  # Get the inserted user ID
 
@@ -180,10 +183,10 @@ async def google_auth_callback(request: Request):
         # If the user does not exist, add them to the database
         if not user:
             insert_query = """
-                INSERT INTO user (email, password, account_activated, login_method)
-                VALUES (%s, %s, %s, %s)
+                INSERT INTO user (email, password, account_activated, login_method, alias)
+                VALUES (%s, %s, %s, %s, %s)
             """
-            cursor.execute(insert_query, (email, generate_password(), True, 'google'))  # Set login_method to google
+            cursor.execute(insert_query, (email, generate_password(), True, 'google', alias))  # Set login_method to google
             db.commit()
             user_id = cursor.lastrowid  # Get the inserted user ID
             account_activated = True
