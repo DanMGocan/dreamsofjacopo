@@ -101,31 +101,20 @@ import os
 import io
 import fitz  # PyMuPDF
 import subprocess
+import requests
 from azure.storage.blob import BlobServiceClient
-from fastapi import HTTPException, Request
+from fastapi import HTTPException, Request, Depends
 import tempfile
+from database_op.database import get_db
+import mysql.connector
+from datetime import datetime, timedelta
+from helpers.blob_op import generate_sas_token_for_file
+
+from helpers.blob_op import upload_to_blob
 
 # Azure Blob settings (replace these with your actual connection string and container name)
-AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+AZURE_STORAGE_ACCOUNT_NAME = os.getenv("AZURE_STORAGE_ACCOUNT_NAME")
 AZURE_BLOB_CONTAINER_NAME = "slide-pull-main"
-
-# Helper function to upload a file to Azure Blob Storage (from in-memory bytes)
-def upload_to_blob(blob_name, data, content_type):
-    try:
-        # Create BlobServiceClient
-        blob_service_client = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
-        blob_client = blob_service_client.get_blob_client(container=AZURE_BLOB_CONTAINER_NAME, blob=blob_name)
-
-        # Upload data to blob (in-memory data as bytes)
-        blob_client.upload_blob(data, blob_type="BlockBlob", content_settings={"content_type": content_type}, overwrite=True)
-        
-        # Return the URL to the uploaded blob
-        blob_url = f"https://{blob_service_client.account_name}.blob.core.windows.net/{AZURE_BLOB_CONTAINER_NAME}/{blob_name}"
-        print(f"Uploaded to Azure Blob: {blob_url}")
-        return blob_url
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to upload file to Azure Blob Storage: {e}")
 
 # Function to convert in-memory .pptx bytes to PDF bytes using LibreOffice
 def convert_pptx_bytes_to_pdf(pptx_bytes, request: Request):
@@ -160,54 +149,94 @@ def convert_pptx_bytes_to_pdf(pptx_bytes, request: Request):
     except Exception as e:
         raise Exception(f"Unexpected error: {e}")
 
-# Convert the generated PDF to images (in-memory processing)
-def convert_pdf_to_images(pdf_blob_url, user_alias, presentation_id):
+def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db):
     try:
-        # Define the base blob name for images
-        image_blob_base = f"{user_alias}/images/{presentation_id}/slide_"
+        cursor = db.cursor(dictionary=True, buffered=True)
 
-        # Download PDF from Azure Blob Storage (in-memory)
-        blob_service_client = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
-        pdf_blob_client = blob_service_client.get_blob_client(container=AZURE_BLOB_CONTAINER_NAME, blob=pdf_blob_url)
-        pdf_bytes = pdf_blob_client.download_blob().readall()
+        # Define the base blob names for images and thumbnails
+        image_blob_base = f"{user_alias}/images/{pdf_id}/slide_"
+        thumbnail_blob_base = f"{user_alias}/thumbnails/{pdf_id}/slide_"
 
-        # Open the PDF from in-memory bytes
+        # Construct the download URL for the PDF using the SAS token
+        pdf_blob_url = f"https://{AZURE_STORAGE_ACCOUNT_NAME}.blob.core.windows.net/{AZURE_BLOB_CONTAINER_NAME}/{pdf_blob_name}"
+        pdf_blob_url_with_sas = f"{pdf_blob_url}?{sas_token_pdf}"
+
+        print(f"Downloading PDF from URL: {pdf_blob_url_with_sas}")
+
+        # Download the PDF bytes using the SAS URL
+        response = requests.get(pdf_blob_url_with_sas)
+        response.raise_for_status()
+        pdf_bytes = response.content
+        if not pdf_bytes:
+            raise Exception("Failed to download PDF content")
+
+        # Open the PDF from in-memory bytes using PyMuPDF (fitz)
         pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
 
-        image_urls = []
+        # Set desired thumbnail width
+        thumbnail_width = 200  # Adjust as needed
 
+        # Convert each page to an image and upload
         for page_number in range(len(pdf_document)):
             page = pdf_document.load_page(page_number)
-            image = page.get_pixmap()
+            pix = page.get_pixmap()
 
-            # Save the image in-memory (to be uploaded to Azure Blob Storage)
-            image_bytes = io.BytesIO()
-            image.save(image_bytes, format="PNG")
-            image_bytes.seek(0)
+            # Get full-size image bytes
+            image_bytes = pix.tobytes("png")
 
             # Define blob name for the current image
             image_blob_name = f"{image_blob_base}{page_number + 1}.png"
 
-            # Upload image to Azure Blob Storage
-            image_url = upload_to_blob(image_blob_name, image_bytes.getvalue(), "image/png")
-            image_urls.append(image_url)
+            # Upload full-size image to Azure Blob Storage
+            image_url, sas_token_image, sas_token_expiry = upload_to_blob(
+                image_blob_name, image_bytes, "image/png", user_alias
+            )
 
+            # Insert image record into database
+            cursor.execute(
+                "INSERT INTO image (pdf_id, url, sas_token, sas_token_expiry) VALUES (%s, %s, %s, %s)",
+                (pdf_id, image_url, sas_token_image, sas_token_expiry)
+            )
+
+            # Generate thumbnail
+            # Calculate scaling factor
+            scale = thumbnail_width / pix.width
+            # Create scaling matrix
+            matrix = fitz.Matrix(scale, scale)
+            # Generate thumbnail pixmap using the matrix
+            thumbnail_pix = page.get_pixmap(matrix=matrix)
+            # Get thumbnail bytes
+            thumbnail_bytes = thumbnail_pix.tobytes("png")
+
+            # Define blob name for the thumbnail
+            thumbnail_blob_name = f"{thumbnail_blob_base}{page_number + 1}.png"
+
+            # Upload thumbnail to Azure Blob Storage
+            thumbnail_url, sas_token_thumbnail, sas_token_thumbnail_expiry = upload_to_blob(
+                thumbnail_blob_name, thumbnail_bytes, "image/png", user_alias
+            )
+
+            # Insert thumbnail record into database
+            cursor.execute(
+                "INSERT INTO thumbnail (pdf_id, url, sas_token, sas_token_expiry) VALUES (%s, %s, %s, %s)",
+                (pdf_id, thumbnail_url, sas_token_thumbnail, sas_token_thumbnail_expiry)
+            )
+
+        db.commit()
+
+        # Close the PDF document
         pdf_document.close()
-        return image_urls
+
+        return "Images and thumbnails converted and uploaded successfully!"
 
     except Exception as e:
+        db.rollback()
         raise Exception(f"Error converting PDF to images: {e}")
+    finally:
+        cursor.close()
 
-# Main conversion function (entire process in-memory)
-def convert_pptx(input_pptx_blob_url, user_alias, presentation_id):
-    try:
-        # Convert PPTX to PDF and upload the PDF to Azure Blob Storage
-        pdf_url = convert_pptx_to_pdf(input_pptx_blob_url, user_alias, presentation_id)
 
-        # Convert PDF to images and upload images to Azure Blob Storage
-        image_urls = convert_pdf_to_images(pdf_url, user_alias, presentation_id)
 
-        return {"message": "Conversion successful", "pdf_url": pdf_url, "image_urls": image_urls}
 
-    except Exception as e:
-        raise Exception(f"Conversion process failed: {e}")
+
+

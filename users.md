@@ -24,3 +24,5 @@ Enforce strong password requirements (minimum length, complexity).
 Educate users on creating secure passwords.
 
 Test the three login methods, to make sure they do not allow cross login. 
+
+Have a mechanism to regenerate SAS Tokens on request

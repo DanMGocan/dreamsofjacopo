@@ -9,9 +9,7 @@ CREATE TABLE user (
     member_since DATETIME DEFAULT CURRENT_TIMESTAMP,
     account_activated BOOLEAN DEFAULT FALSE,
     login_method ENUM("slide_pull", "google", "microsoft") NOT NULL,
-    alias VARCHAR(255) NOT NULL UNIQUE,
-    sas_token VARCHAR(512) UNIQUE,  -- Reduced length for SAS token
-    sas_token_expiry DATETIME
+    alias VARCHAR(255) NOT NULL UNIQUE
 );
 
 -- PDF Table
@@ -20,6 +18,8 @@ CREATE TABLE pdf (
     user_id INT,
     url VARCHAR(512) NOT NULL,  -- Reduced length for URL
     original_filename VARCHAR(255),
+    sas_token VARCHAR(256) NOT NULL,
+    sas_token_expiry DATETIME,
     FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE
 );
 
@@ -29,8 +29,20 @@ CREATE TABLE image (
     pdf_id INT,
     url VARCHAR(512) NOT NULL,  -- Reduced length for URL
     uploaded_on DATETIME DEFAULT CURRENT_TIMESTAMP,
+    sas_token VARCHAR(256) NOT NULL,
+    sas_token_expiry DATETIME,
     FOREIGN KEY (pdf_id) REFERENCES pdf(pdf_id) ON DELETE CASCADE
 );
+
+CREATE TABLE thumbnail (
+    thumbnail_id INT AUTO_INCREMENT PRIMARY KEY,
+    pdf_id INT NOT NULL,
+    url VARCHAR(255) NOT NULL,
+    sas_token VARCHAR(2048) NOT NULL,
+    sas_token_expiry DATETIME NOT NULL,
+    FOREIGN KEY (pdf_id) REFERENCES pdf(pdf_id) ON DELETE CASCADE
+);
+
 
 -- Set Table
 CREATE TABLE `set` (
