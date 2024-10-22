@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Request, HTTPException, BackgroundTasks, Depends
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 from passlib.context import CryptContext
@@ -15,7 +15,7 @@ import uuid
 
 import os
 
-SECRET_KEY = os.getenv('SECRET_KEY', 'your-secret-key')  # Ensure to set this in your .env file
+SECRET_KEY = os.getenv('SECRET_KEY')  # Ensure to set this in your .env file
 serializer = URLSafeSerializer(SECRET_KEY)
 alias = str(uuid.uuid4())
 
@@ -50,7 +50,11 @@ async def show_registration_page(request: Request):
     return templates.TemplateResponse("registration.html", {"request": request})
 
 @users.post("/create-account")
-async def create_account(request: Request, background_tasks: BackgroundTasks):
+async def create_account(
+    request: Request, 
+    background_tasks: BackgroundTasks, 
+    db: mysql.connector.connection.MySQLConnection = Depends(get_db)
+):
     form = await request.form()
     email = form.get("email")
     password = form.get("password")
@@ -60,11 +64,6 @@ async def create_account(request: Request, background_tasks: BackgroundTasks):
 
     # Hash the password
     hashed_password = pwd_context.hash(password)
-
-    # Insert the user into the database
-    db = get_db()
-    if db is None:
-        raise HTTPException(status_code=500, detail="Database connection error")
 
     try:
         cursor = db.cursor()
@@ -77,10 +76,6 @@ async def create_account(request: Request, background_tasks: BackgroundTasks):
         cursor.execute(insert_query, (email, hashed_password, False, 'slide_pull', alias))  # Set account_activated to False and login_method to 'slide_pull'
         db.commit()
         user_id = cursor.lastrowid  # Get the inserted user ID
-
-        # Close the cursor and connection after committing
-        cursor.close()
-        db.close()
 
         # Generate activation token
         token = serializer.dumps(user_id, salt='activate-account')
@@ -100,16 +95,17 @@ async def create_account(request: Request, background_tasks: BackgroundTasks):
     except mysql.connector.IntegrityError as e:
         # Handle duplicate email error
         if e.errno == mysql.connector.errorcode.ER_DUP_ENTRY:
-            cursor.close()
-            db.close()
             raise HTTPException(status_code=400, detail="Email already registered")
         else:
-            cursor.close()
-            db.close()
             raise HTTPException(status_code=500, detail="Database error")
+    finally:
+        cursor.close()  # Ensure the cursor is closed
 
 @users.post("/login")
-async def login(request: Request):
+async def login(
+    request: Request, 
+    db: mysql.connector.connection.MySQLConnection = Depends(get_db)
+):
     form = await request.form()
     email = form.get("email")
     password = form.get("password")
@@ -117,17 +113,11 @@ async def login(request: Request):
     if not email or not password:
         raise HTTPException(status_code=400, detail="Email and password are required")
 
-    db = get_db()
-    if db is None:
-        raise HTTPException(status_code=500, detail="Database connection error")
-
     try:
         cursor = db.cursor(dictionary=True)
-        query = "SELECT user_id, password, account_activated, login_method FROM user WHERE email = %s"
+        query = "SELECT user_id, password, account_activated, login_method, alias FROM user WHERE email = %s"
         cursor.execute(query, (email,))
         user = cursor.fetchone()
-        cursor.close()
-        db.close()
 
         if user:
             # Check if the user registered with slide_pull
@@ -140,6 +130,7 @@ async def login(request: Request):
                 request.session['user_id'] = user['user_id']
                 request.session['email'] = email
                 request.session['account_activated'] = user['account_activated']
+                request.session['alias'] = user['alias']
 
                 # Redirect to the dashboard
                 return RedirectResponse(url="/dashboard", status_code=303)
@@ -149,6 +140,9 @@ async def login(request: Request):
             raise HTTPException(status_code=401, detail="Invalid email or password")
     except mysql.connector.Error as e:
         raise HTTPException(status_code=500, detail="Database error")
+    finally:
+        cursor.close()  # Ensure the cursor is closed
+
 
 # Google Login Endpoint
 @users.get("/login/google")
@@ -165,7 +159,7 @@ async def google_auth_callback(request: Request):
 
     # Extract the user's email from the userinfo
     email = userinfo.get('email')
-    google_user_id = userinfo.get('sub')
+    # Will it work if I comment this? google_user_id = userinfo.get('sub')
 
     # Open a database connection
     db = get_db()

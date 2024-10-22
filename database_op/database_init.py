@@ -14,8 +14,8 @@ config = {
     'database': os.getenv('DB_NAME')
 }
 
-# Function to create the database if it doesn't exist
-def create_database():
+# Function to drop and recreate the database
+def recreate_database():
     try:
         # Connect to the MySQL server without specifying a database
         connection = mysql.connector.connect(
@@ -24,20 +24,27 @@ def create_database():
             host=config['host']
         )
         cursor = connection.cursor()
-        cursor.execute(f"CREATE DATABASE IF NOT EXISTS {config['database']}")
+
+        # Drop the existing database if it exists
+        cursor.execute(f"DROP DATABASE IF EXISTS {config['database']}")
+        print(f"Database '{config['database']}' dropped successfully!")
+
+        # Create a new database
+        cursor.execute(f"CREATE DATABASE {config['database']}")
         print(f"Database '{config['database']}' created successfully!")
+
         cursor.close()
         connection.close()
     except mysql.connector.Error as err:
-        print(f"Error creating database: {err}")
+        print(f"Error recreating database: {err}")
 
 # Function to execute schema.sql and create tables
 def initialize_database():
     try:
-        # First, ensure the database exists
-        create_database()
+        # First, recreate the database
+        recreate_database()
         
-        # Connect to the database
+        # Connect to the newly created database
         connection = mysql.connector.connect(**config)
         cursor = connection.cursor()
 
@@ -49,7 +56,7 @@ def initialize_database():
         for statement in schema_sql.split(';'):
             if statement.strip():
                 cursor.execute(statement)
-                print(f"Executed: {statement.strip()[:50]}...")
+                print(f"Executed: {statement.strip()[:50]}...")  # Show first 50 chars of the statement
         
         # Commit the transaction
         connection.commit()

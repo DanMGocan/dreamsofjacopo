@@ -24,6 +24,15 @@
         </div>
     {% endif %} 
 
+    <h1>Upload your .pptx file</h1>
+    <form action="/upload-pptx" method="post" enctype="multipart/form-data">
+        <label for="pptx_file">Choose .pptx file:</label>
+        <input type="file" id="pptx_file" name="pptx_file" accept=".pptx" required>
+        <button type="submit">Upload</button>
+    </form>
+    <a href="/">Home</a>
+
+
     <a href="/logout">Logout</a>
 </body>
 </html>

@@ -102,7 +102,8 @@ import io
 import fitz  # PyMuPDF
 import subprocess
 from azure.storage.blob import BlobServiceClient
-from fastapi import HTTPException
+from fastapi import HTTPException, Request
+import tempfile
 
 # Azure Blob settings (replace these with your actual connection string and container name)
 AZURE_STORAGE_CONNECTION_STRING = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
@@ -126,43 +127,33 @@ def upload_to_blob(blob_name, data, content_type):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to upload file to Azure Blob Storage: {e}")
 
-# Convert PPTX to PDF using LibreOffice and upload the result to Azure Blob
-def convert_pptx_to_pdf(pptx_blob_url, user_alias, presentation_id):
+# Function to convert in-memory .pptx bytes to PDF bytes using LibreOffice
+def convert_pptx_bytes_to_pdf(pptx_bytes, request: Request):
     try:
-        # Define the output PDF blob name
-        pdf_blob_name = f"{user_alias}/pdf/{presentation_id}/presentation.pdf"
+        # Create in-memory buffers for input (.pptx) and output (.pdf)
+        pptx_in_memory = io.BytesIO(pptx_bytes)
 
-        # Download PPTX from Azure Blob Storage (fetch in-memory)
-        blob_service_client = BlobServiceClient.from_connection_string(AZURE_STORAGE_CONNECTION_STRING)
-        pptx_blob_client = blob_service_client.get_blob_client(container=AZURE_BLOB_CONTAINER_NAME, blob=pptx_blob_url)
-        pptx_bytes = pptx_blob_client.download_blob().readall()
+        # Create a temporary directory for storing files
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Define temporary file paths for PPTX and PDF inside the temporary directory
+            temp_pptx_path = os.path.join(temp_dir, "temp_presentation.pptx")
+            temp_pdf_path = os.path.join(temp_dir, "temp_presentation.pdf")
 
-        # Write PPTX bytes to temporary in-memory file
-        temp_pptx_path = "/tmp/temp_presentation.pptx"
-        with open(temp_pptx_path, "wb") as f:
-            f.write(pptx_bytes)
+            # Write the PPTX to the temporary path
+            with open(temp_pptx_path, "wb") as f:
+                f.write(pptx_in_memory.getbuffer())
 
-        # Define the temporary output path for PDF
-        temp_pdf_path = "/tmp/temp_presentation.pdf"
+            # Get LibreOffice path (adjust for your environment)
+            soffice_path = os.getenv("SOFFICE_PATH", r'C:\Program Files\LibreOffice\program\soffice.exe')
 
-        # Get LibreOffice path
-        soffice_path = os.getenv("SOFFICE_PATH", r'C:\Program Files\LibreOffice\program\soffice.exe')
+            # Run LibreOffice command to convert PPTX to PDF in memory
+            subprocess.run([soffice_path, '--headless', '--convert-to', 'pdf', temp_pptx_path, '--outdir', temp_dir], check=True, timeout=120)
 
-        # Run LibreOffice command to convert PPTX to PDF
-        subprocess.run([soffice_path, '--headless', '--convert-to', 'pdf', temp_pptx_path, '--outdir', "/tmp"], check=True, timeout=120)
+            # Read the PDF file as bytes
+            with open(temp_pdf_path, "rb") as pdf_file:
+                pdf_data = pdf_file.read()
 
-        # Check if PDF was created
-        if not os.path.exists(temp_pdf_path):
-            raise Exception("PDF creation failed")
-
-        # Read the PDF file as bytes
-        with open(temp_pdf_path, "rb") as pdf_file:
-            pdf_data = pdf_file.read()
-
-        # Upload PDF to Azure Blob Storage
-        pdf_url = upload_to_blob(pdf_blob_name, pdf_data, "application/pdf")
-        
-        return pdf_url
+            return pdf_data
 
     except subprocess.CalledProcessError as e:
         raise Exception(f"Failed to convert PPTX to PDF: {e}")
