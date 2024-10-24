@@ -76,7 +76,7 @@ def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db):
         pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
 
         # Set desired thumbnail width
-        thumbnail_width = 200  # Adjust as needed
+        thumbnail_width = 300  # Adjust as needed
 
         # Convert each page to an image and upload
         for page_number in range(len(pdf_document)):

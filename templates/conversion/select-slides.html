@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Select Thumbnails</title>
+</head>
+<body>
+    <h1>Select Thumbnails for Presentation ID: {{ pdf_id }}</h1>
+    <form action="/generate-set/{{ pdf_id }}" method="POST">
+        {% if thumbnails %}
+            <div>
+                {% for thumbnail in thumbnails %}
+                    <label>
+                        <input type="checkbox" name="selected_thumbnails" value="{{ thumbnail.thumbnail_id }}">
+                        <img src="{{ thumbnail.url }}?{{ thumbnail.sas_token }}" alt="Thumbnail" width="200" height="150">
+                    </label>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p>No thumbnails found for this presentation.</p>
+        {% endif %}
+        <button type="submit">Generate QR Code</button>
+    </form>
+</body>
+</html>

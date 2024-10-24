@@ -2,7 +2,7 @@ from fastapi import APIRouter, UploadFile, File, Request, Depends, HTTPException
 import os
 import io
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import RedirectResponse 
+from fastapi.responses import RedirectResponse, HTMLResponse
 
 from helpers.flash_utils import set_flash_message
 from helpers.blob_op import generate_sas_token_for_file  # Import the SAS token generator
@@ -11,8 +11,8 @@ from core.main_converter import convert_pptx_bytes_to_pdf, convert_pdf_to_images
 from dotenv import load_dotenv
 from azure.storage.blob import BlobServiceClient, BlobClient
 from database_op.database import get_db
-from datetime import datetime, timedelta
 import mysql.connector
+from mysql.connector import connection
 from mysql.connector.pooling import MySQLConnectionPool
 
 # Load environment variables
@@ -202,3 +202,26 @@ async def delete_presentation(
 
     # Return the response with the flash message
     return response
+
+@converter.get("/select-slides/{pdf_id}", response_class=HTMLResponse)
+async def select_thumbnails(
+    pdf_id: int,
+    request: Request,
+    db: connection.MySQLConnection = Depends(get_db)
+):
+    # Ensure user is logged in
+    if 'user_id' not in request.session:
+        return RedirectResponse(url="/login")
+
+    # Fetch thumbnails for the selected pdf_id, including the SAS token
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("SELECT thumbnail_id, url, sas_token FROM thumbnail WHERE pdf_id = %s", (pdf_id,))
+    thumbnails = cursor.fetchall()
+    cursor.close()
+
+    # Render the template to display thumbnails
+    return templates.TemplateResponse("conversion/select-slides.html", {
+        "request": request,
+        "pdf_id": pdf_id,
+        "thumbnails": thumbnails
+    })
