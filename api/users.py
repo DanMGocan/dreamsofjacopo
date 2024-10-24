@@ -18,6 +18,8 @@ import uuid
 
 import os
 
+from datetime import datetime
+
 SECRET_KEY = os.getenv('SECRET_KEY')  # Ensure to set this in your .env file
 serializer = URLSafeSerializer(SECRET_KEY)
 
@@ -74,10 +76,10 @@ async def create_account(
 
         # Insert user with login_method as 'slide_pull' for traditional email/password signup
         insert_query = """
-            INSERT INTO user (email, password, account_activated, login_method, alias)
-            VALUES (%s, %s, %s, %s, %s)
+            INSERT INTO user (email, password, account_activated, login_method, alias, premium_status, member_since)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
         """
-        cursor.execute(insert_query, (email, hashed_password, False, 'slide_pull', alias))
+        cursor.execute(insert_query, (email, hashed_password, False, 'slide_pull', alias, 0, datetime.now()))
         db.commit()
         user_id = cursor.lastrowid  # Get the inserted user ID
 
@@ -87,19 +89,22 @@ async def create_account(
         token = serializer.dumps(user_id, salt='activate-account')
 
         # Send activation email in the background
-        # background_tasks.add_task(send_activation_email, email, token)
+        background_tasks.add_task(send_activation_email, email, token)
 
         # Generate activation token
         token = serializer.dumps(user_id, salt='activate-account')
 
         # Send activation email in the background
-        background_tasks.add_task(send_activation_email, email, token)
+        # background_tasks.add_task(send_activation_email, email, token)
 
         # Store user info in session and redirect to the dashboard
         request.session['user_id'] = user_id
         request.session['email'] = email
         request.session['account_activated'] = False  # Initially set to False
         request.session['login_method'] = 'slide_pull'  # Store login method in session
+        request.session['premium_status'] = 0  # Default to free user
+        request.session['member_since'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')  # Convert to string for session
+
 
         # You might want to redirect the user to a 'Check your email' page
         # return RedirectResponse(url="/check-your-email", status_code=303)
@@ -149,20 +154,17 @@ async def login_via_google(request: Request):
     redirect_uri = config("GOOGLE_REDIRECT_URI")
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
-# Google Callback Endpoint
 @users.get("/auth/google/callback")
 async def google_auth_callback(
     request: Request,
     db: mysql.connector.connection.MySQLConnection = Depends(get_db)
 ):
-    
     # Fetch the token from the authorization callback
     token = await oauth.google.authorize_access_token(request)
     userinfo = token.get('userinfo')
 
     # Extract the user's email from the userinfo
     email = userinfo.get('email')
-    # Will it work if I comment this? google_user_id = userinfo.get('sub')
 
     # Open a database connection
     if db is None:
@@ -170,11 +172,11 @@ async def google_auth_callback(
 
     try:
         cursor = db.cursor(dictionary=True)
-        # Generate a unique alias for the user
+        # Generate a unique alias for the user (if new)
         alias = str(uuid.uuid4())
 
         # Check if the user already exists in the database
-        query = "SELECT user_id, email, account_activated, login_method FROM user WHERE email = %s"
+        query = "SELECT user_id, email, account_activated, login_method, premium_status, member_since, alias FROM user WHERE email = %s"
         cursor.execute(query, (email,))
         user = cursor.fetchone()
 
@@ -184,33 +186,43 @@ async def google_auth_callback(
                 INSERT INTO user (email, password, account_activated, login_method, alias)
                 VALUES (%s, %s, %s, %s, %s)
             """
-            cursor.execute(insert_query, (email, pwd_context.hash(generate_password()), True, 'google', alias))  # Set login_method to google
+            cursor.execute(insert_query, (email, pwd_context.hash(generate_password()), True, 'google', alias))  # Set login_method to 'google'
             db.commit()
 
             user_id = cursor.lastrowid  # Get the inserted user ID
             account_activated = True
+            premium_status = 0  # Default to free user
+            member_since = None  # Set as None, will update later if needed
+            alias = alias  # Generated alias
         else:
-            # User already exists, get their user_id and activation status
+            # User already exists, get their data
             user_id = user['user_id']
             account_activated = user['account_activated']
+            premium_status = user['premium_status']
+            member_since = user['member_since']
+            alias = user['alias']
 
             # Check if the user registered with a different method
             if user['login_method'] != 'google':
                 raise HTTPException(status_code=403, detail="You registered with a different login method. Please use that method to log in.")
 
         cursor.close()
-        db.close()
 
         # Store user info in the session
         request.session['user_id'] = user_id
         request.session['email'] = email
         request.session['account_activated'] = account_activated
+        request.session['login_method'] = 'google'
+        request.session['premium_status'] = premium_status
+        request.session['member_since'] = str(member_since) if member_since else None
+        request.session['alias'] = alias
 
         # Redirect to the dashboard
         return RedirectResponse(url="/dashboard", status_code=303)
 
     except mysql.connector.Error as e:
         raise HTTPException(status_code=500, detail="Database error")
+
 
 # Route to handle logout
 @users.get("/logout")

@@ -83,7 +83,3 @@ async def dashboard(request: Request, db: mysql.connector.connection.MySQLConnec
         "member_since": member_since,
         "presentations": presentations  # Pass the list of presentations to the template
     })
-
-
-
-
