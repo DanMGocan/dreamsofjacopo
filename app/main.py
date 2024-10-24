@@ -5,6 +5,10 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from helpers.flash_utils import get_flash_message
 from starlette.middleware.sessions import SessionMiddleware
 from dotenv import load_dotenv
+import mysql.connector
+from database_op.database import get_db
+
+
 
 import logging
 
@@ -42,21 +46,44 @@ async def upload_form(request: Request):
     return templates.TemplateResponse("/home.html", {"request": request})
 
 @app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard(request: Request):
+async def dashboard(request: Request, db: mysql.connector.connection.MySQLConnection = Depends(get_db)):
 
+    # Ensure the user is logged in
     if 'email' not in request.session:
-        # If no session exists, redirect to the login page
         return RedirectResponse(url="/login")
 
-    # Get the user's email from the session
+    # Get user session details
     email = request.session['email']
     user_id = request.session['user_id']
     account_activated = request.session['account_activated']
+    premium_status = request.session['premium_status']
+    member_since = request.session['member_since']
 
     # Check if there's a flash message to display
     flash_message = get_flash_message(request)
 
-    return templates.TemplateResponse("dashboard.html", {"request": request, "user_id": user_id, "email": email, "flash_message": flash_message, "account_activated": account_activated})
+    # Fetch user's uploaded presentations from the database, including pdf_id
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("""
+        SELECT pdf_id, original_filename, url, sas_token_expiry AS uploaded_on 
+        FROM pdf 
+        WHERE user_id = %s
+    """, (user_id,))
+    presentations = cursor.fetchall()
+    cursor.close()
+
+    # Render the dashboard template with all the user and presentation data
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request,
+        "user_id": user_id,
+        "email": email,
+        "flash_message": flash_message,
+        "account_activated": account_activated,
+        "premium_status": premium_status,
+        "member_since": member_since,
+        "presentations": presentations  # Pass the list of presentations to the template
+    })
+
 
 
 

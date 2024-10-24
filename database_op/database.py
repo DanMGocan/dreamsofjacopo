@@ -1,28 +1,34 @@
-import mysql.connector.pooling
 import os
-from dotenv import load_dotenv
+import mysql.connector
+from mysql.connector import pooling
 from typing import Generator
-from fastapi import Depends
+import logging
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Load environment variables from a .env file
+# Load environment variables
+from dotenv import load_dotenv
 load_dotenv()
 
-# Database connection configuration using environment variables for security
+# Database connection configuration
 config = {
     'user': os.getenv('DB_USER'),
     'password': os.getenv('DB_PASSWORD'),
     'host': os.getenv('DB_HOST'),
     'database': os.getenv('DB_NAME'),
     'pool_name': 'mypool',
-    'pool_size': 5  # Set a connection pool size (can adjust based on app's needs)
+    'pool_size': 5
 }
 
 # Initialize the connection pool
 try:
     connection_pool = mysql.connector.pooling.MySQLConnectionPool(**config)
+    logger.info("Database connection pool initialized.")
 except mysql.connector.Error as err:
-    print(f"Error connecting to database pool: {err}")
+    logger.error(f"Error connecting to database pool: {err}")
+    connection_pool = None
 
 def get_db() -> Generator:
     connection = None
@@ -31,11 +37,13 @@ def get_db() -> Generator:
         yield connection
     except mysql.connector.Error as err:
         print(f"Database error: {err}")
-        if connection:
-            connection.close()
+        # Do not close the connection here
+        # Optionally, re-raise the exception if you want the caller to handle it
+        raise
     finally:
-        if connection and connection.is_connected():
-            connection.close()
+        if connection:
+            try:
+                connection.close()
+            except Exception as e:
+                print(f"Error closing connection: {e}")
 
-
-        

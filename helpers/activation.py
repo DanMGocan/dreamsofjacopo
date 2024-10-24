@@ -12,4 +12,3 @@ def verify_activation_token(token, expiration=3600):
         return user_id
     except Exception:
         return None
-

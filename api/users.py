@@ -6,9 +6,12 @@ from database_op.database import get_db  # Import the get_db function
 import mysql.connector
 from itsdangerous.exc import BadSignature, SignatureExpired
 from itsdangerous import URLSafeSerializer
+
 from helpers.email_utils import send_activation_email
 from helpers.flash_utils import set_flash_message
 from helpers.pass_utility import generate_password
+from helpers.user_utils import authenticate_user
+
 from authlib.integrations.starlette_client import OAuth
 from starlette.config import Config
 import uuid
@@ -17,8 +20,6 @@ import os
 
 SECRET_KEY = os.getenv('SECRET_KEY')  # Ensure to set this in your .env file
 serializer = URLSafeSerializer(SECRET_KEY)
-alias = str(uuid.uuid4())
-
 
 users = APIRouter()
 
@@ -47,7 +48,7 @@ oauth.register(
 # Route to display the registration page
 @users.get("/registration", response_class=HTMLResponse)
 async def show_registration_page(request: Request):
-    return templates.TemplateResponse("registration.html", {"request": request})
+    return templates.TemplateResponse("users/registration.html", {"request": request})
 
 @users.post("/create-account")
 async def create_account(
@@ -68,14 +69,25 @@ async def create_account(
     try:
         cursor = db.cursor()
 
+        # Generate a unique alias for the user
+        alias = str(uuid.uuid4())
+
         # Insert user with login_method as 'slide_pull' for traditional email/password signup
         insert_query = """
             INSERT INTO user (email, password, account_activated, login_method, alias)
             VALUES (%s, %s, %s, %s, %s)
         """
-        cursor.execute(insert_query, (email, hashed_password, False, 'slide_pull', alias))  # Set account_activated to False and login_method to 'slide_pull'
+        cursor.execute(insert_query, (email, hashed_password, False, 'slide_pull', alias))
         db.commit()
         user_id = cursor.lastrowid  # Get the inserted user ID
+
+        # Generate activation token
+        from itsdangerous import URLSafeTimedSerializer
+        serializer = URLSafeTimedSerializer(os.getenv('SECRET_KEY'))
+        token = serializer.dumps(user_id, salt='activate-account')
+
+        # Send activation email in the background
+        # background_tasks.add_task(send_activation_email, email, token)
 
         # Generate activation token
         token = serializer.dumps(user_id, salt='activate-account')
@@ -89,7 +101,8 @@ async def create_account(
         request.session['account_activated'] = False  # Initially set to False
         request.session['login_method'] = 'slide_pull'  # Store login method in session
 
-        # Redirect to the dashboard
+        # You might want to redirect the user to a 'Check your email' page
+        # return RedirectResponse(url="/check-your-email", status_code=303)
         return RedirectResponse(url="/dashboard", status_code=303)
 
     except mysql.connector.IntegrityError as e:
@@ -103,46 +116,32 @@ async def create_account(
 
 @users.post("/login")
 async def login(
-    request: Request, 
+    request: Request,
     db: mysql.connector.connection.MySQLConnection = Depends(get_db)
 ):
+    # Extract form data
     form = await request.form()
     email = form.get("email")
     password = form.get("password")
 
+    # Check if both email and password are provided
     if not email or not password:
         raise HTTPException(status_code=400, detail="Email and password are required")
 
-    try:
-        cursor = db.cursor(dictionary=True)
-        query = "SELECT user_id, password, account_activated, login_method, alias FROM user WHERE email = %s"
-        cursor.execute(query, (email,))
-        user = cursor.fetchone()
+    # Authenticate the user and get the full user data
+    user_data = await authenticate_user(email=email, password=password, db=db)
 
-        if user:
-            # Check if the user registered with slide_pull
-            if user['login_method'] != 'slide_pull':
-                raise HTTPException(status_code=403, detail="You registered with a different login method. Please use that method to log in.")
+    # Store the entire user info (excluding password) in the session
+    request.session['user_id'] = user_data['user_id']
+    request.session['email'] = user_data['email']
+    request.session['premium_status'] = user_data['premium_status']
+    request.session['member_since'] = str(user_data['member_since'])  # Serialize datetime
+    request.session['account_activated'] = user_data['account_activated']
+    request.session['login_method'] = user_data['login_method']
+    request.session['alias'] = user_data['alias']
 
-            # Verify the password for traditional users
-            if pwd_context.verify(password, user['password']):
-                # Store user info in the session
-                request.session['user_id'] = user['user_id']
-                request.session['email'] = email
-                request.session['account_activated'] = user['account_activated']
-                request.session['alias'] = user['alias']
-
-                # Redirect to the dashboard
-                return RedirectResponse(url="/dashboard", status_code=303)
-            else:
-                raise HTTPException(status_code=401, detail="Invalid email or password")
-        else:
-            raise HTTPException(status_code=401, detail="Invalid email or password")
-    except mysql.connector.Error as e:
-        raise HTTPException(status_code=500, detail="Database error")
-    finally:
-        cursor.close()  # Ensure the cursor is closed
-
+    # Redirect to the dashboard after successful login
+    return RedirectResponse(url="/dashboard", status_code=303)
 
 # Google Login Endpoint
 @users.get("/login/google")
@@ -152,7 +151,11 @@ async def login_via_google(request: Request):
 
 # Google Callback Endpoint
 @users.get("/auth/google/callback")
-async def google_auth_callback(request: Request):
+async def google_auth_callback(
+    request: Request,
+    db: mysql.connector.connection.MySQLConnection = Depends(get_db)
+):
+    
     # Fetch the token from the authorization callback
     token = await oauth.google.authorize_access_token(request)
     userinfo = token.get('userinfo')
@@ -162,12 +165,13 @@ async def google_auth_callback(request: Request):
     # Will it work if I comment this? google_user_id = userinfo.get('sub')
 
     # Open a database connection
-    db = get_db()
     if db is None:
         raise HTTPException(status_code=500, detail="Database connection error")
 
     try:
         cursor = db.cursor(dictionary=True)
+        # Generate a unique alias for the user
+        alias = str(uuid.uuid4())
 
         # Check if the user already exists in the database
         query = "SELECT user_id, email, account_activated, login_method FROM user WHERE email = %s"
@@ -180,8 +184,9 @@ async def google_auth_callback(request: Request):
                 INSERT INTO user (email, password, account_activated, login_method, alias)
                 VALUES (%s, %s, %s, %s, %s)
             """
-            cursor.execute(insert_query, (email, generate_password(), True, 'google', alias))  # Set login_method to google
+            cursor.execute(insert_query, (email, pwd_context.hash(generate_password()), True, 'google', alias))  # Set login_method to google
             db.commit()
+
             user_id = cursor.lastrowid  # Get the inserted user ID
             account_activated = True
         else:

@@ -5,7 +5,7 @@ CREATE TABLE user (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
-    premium_status BOOLEAN DEFAULT FALSE,
+    premium_status INT DEFAULT 0,
     member_since DATETIME DEFAULT CURRENT_TIMESTAMP,
     account_activated BOOLEAN DEFAULT FALSE,
     login_method ENUM("slide_pull", "google", "microsoft") NOT NULL,
