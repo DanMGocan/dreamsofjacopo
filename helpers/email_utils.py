@@ -56,14 +56,10 @@ def send_activation_email(email_to, token):
     mailer.set_reply_to(reply_to, mail_body)
 
     try:
-        # Send the email
+        # Send the email and check if it raises an error
         response = mailer.send(mail_body)
+        print("MailerSend response:", response)  # Debug line to check response type
+        print(f"Activation email sent to {email_to}")
 
-        # Check for success
-        if response['status_code'] == 202:
-            print(f"Activation email sent to {email_to}")
-        else:
-            print(f"Failed to send email. Status Code: {response['status_code']}")
-            print(f"Error: {response}")
     except Exception as e:
         print(f"Error sending activation email: {e}")
