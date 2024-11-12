@@ -11,3 +11,5 @@ ppts/
 data_conversion.csv
 
 .VSCodeCounter/
+
+.env
