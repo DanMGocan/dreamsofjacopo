@@ -8,12 +8,6 @@ from dotenv import load_dotenv
 import mysql.connector
 from database_op.database import get_db
 
-
-
-import logging
-
-# Example logging for debugging
-logging.basicConfig(level=logging.DEBUG)
 load_dotenv()
 
 import os

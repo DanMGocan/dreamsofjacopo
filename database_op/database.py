@@ -22,28 +22,37 @@ config = {
     'pool_size': 5
 }
 
+# Ensure all required environment variables are loaded
+assert config['user'], "Environment variable DB_USER is missing"
+assert config['password'], "Environment variable DB_PASSWORD is missing"
+assert config['host'], "Environment variable DB_HOST is missing"
+assert config['database'], "Environment variable DB_NAME is missing"
+
 # Initialize the connection pool
 try:
     connection_pool = mysql.connector.pooling.MySQLConnectionPool(**config)
-    logger.info("Database connection pool initialized.")
+    logger.info("Database connection pool initialized successfully.")
 except mysql.connector.Error as err:
-    logger.error(f"Error connecting to database pool: {err}")
-    connection_pool = None
+    logger.error(f"Error initializing database connection pool: {err}", exc_info=True)
+    raise RuntimeError("Failed to initialize database connection pool") from err
 
 def get_db() -> Generator:
+    """
+    Provides a database connection from the pool.
+    Ensures the connection is returned to the pool after use.
+    """
     connection = None
     try:
+        logger.info("Getting a connection from the pool.")
         connection = connection_pool.get_connection()
         yield connection
     except mysql.connector.Error as err:
-        print(f"Database error: {err}")
-        # Do not close the connection here
-        # Optionally, re-raise the exception if you want the caller to handle it
+        logger.error(f"Error while getting a connection from the pool: {err}", exc_info=True)
         raise
     finally:
         if connection:
             try:
+                logger.info("Closing the connection and returning it to the pool.")
                 connection.close()
             except Exception as e:
-                print(f"Error closing connection: {e}")
-
+                logger.error(f"Error closing the connection: {e}", exc_info=True)

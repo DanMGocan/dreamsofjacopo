@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Request, Depends, HTTPException
+from fastapi import APIRouter, UploadFile, File, Request, Depends, HTTPException, Form
 import os
 import io
 from fastapi.templating import Jinja2Templates
@@ -14,6 +14,12 @@ from database_op.database import get_db
 import mysql.connector
 from mysql.connector import connection
 from mysql.connector.pooling import MySQLConnectionPool
+
+import zipfile
+from typing import List
+from pydantic import parse_obj_as
+import datetime
+
 
 # Load environment variables
 load_dotenv()
@@ -116,10 +122,14 @@ async def upload_pptx(
         convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db)
 
         # Return the SAS URL for the PDF
-        return {
-            "message": "File uploaded and converted to PDF successfully!",
-            "sas_url": pdf_blob_url_with_sas
-        }
+        # Create a RedirectResponse first
+        response = RedirectResponse(url="/dashboard", status_code=303)
+
+        # Set a flash message indicating the presentation and associated files were deleted
+        set_flash_message(response, "All good homie!")
+
+        # Return the response with the flash message
+        return response
 
     except Exception as e:
         db.rollback()
@@ -129,9 +139,6 @@ async def upload_pptx(
             cursor.close()
         except:
             pass
-
-from starlette.responses import RedirectResponse
-from fastapi import Request
 
 @converter.post("/delete-presentation/{pdf_id}")
 async def delete_presentation(
@@ -225,3 +232,122 @@ async def select_thumbnails(
         "pdf_id": pdf_id,
         "thumbnails": thumbnails
     })
+
+@converter.post("/generate-set/{pdf_id}", response_class=HTMLResponse)
+async def generate_set(
+    pdf_id: int,
+    request: Request,
+    selected_thumbnails: List[str] = Form(...),
+    set_name: str = Form(...),
+    db: mysql.connector.MySQLConnection = Depends(get_db),
+):
+    print("[DEBUG] Entering generate_set endpoint")
+    print(f"[DEBUG] PDF ID: {pdf_id}")
+
+    # Check session validity before any operations
+    if 'user_id' not in request.session:
+        print("[DEBUG] User is not logged in")
+        return RedirectResponse(url="/login")
+
+    print("[DEBUG] User is logged in")
+    """
+    Handles the selection of thumbnails, zipping them, uploading to Azure Blob Storage,
+    and storing metadata in the database.
+
+    Args:
+        pdf_id (int): The ID of the PDF for which thumbnails are selected.
+        request (Request): FastAPI request object.
+        selected_thumbnails (List[str]): IDs of selected thumbnails from the form.
+        set_name (str): User-provided name for the set.
+        db (mysql.connector.MySQLConnection): MySQL database connection.
+
+    Returns:
+        RedirectResponse: Redirect to the created set's page.
+    """
+    try:
+        print(f"[INFO] Processing PDF ID: {pdf_id}")
+        print(f"[INFO] Selected thumbnails: {selected_thumbnails}")
+        print(f"[INFO] Set name: {set_name}")
+
+        # Convert selected thumbnails from List[str] to List[int]
+        selected_thumbnails = parse_obj_as(List[int], selected_thumbnails)
+
+        # Ensure the user is logged in
+        if 'user_id' not in request.session:
+            print("[ERROR] User not logged in")
+            return RedirectResponse(url="/login")
+
+        # Get the logged-in user's ID from the session
+        user_id = request.session['user_id']
+        print(f"[INFO] User ID: {user_id}")
+
+        # Fetch selected thumbnails from the database
+        cursor = db.cursor(dictionary=True)
+        query = "SELECT url, sas_token FROM thumbnail WHERE thumbnail_id IN (%s)" % ",".join(map(str, selected_thumbnails))
+        print(f"[INFO] Executing query: {query}")
+        cursor.execute(query)
+        thumbnails = cursor.fetchall()
+        cursor.close()
+
+        if not thumbnails:
+            print("[WARNING] No valid thumbnails found for the given IDs.")
+            raise HTTPException(status_code=404, detail="No valid thumbnails selected.")
+
+        # Create a zip file in memory
+        zip_buffer = io.BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+            for thumbnail in thumbnails:
+                print(f"[INFO] Downloading thumbnail: {thumbnail['url']}")
+                # Fetch the image from Azure Blob Storage
+                blob_client = BlobClient.from_blob_url(f"{thumbnail['url']}?{thumbnail['sas_token']}")
+                blob_data = blob_client.download_blob().readall()
+
+                # Add the image to the zip file
+                filename = os.path.basename(thumbnail['url'])
+                zip_file.writestr(filename, blob_data)
+
+        zip_buffer.seek(0)
+        print("[INFO] Successfully created ZIP archive in memory")
+
+        # Upload the zip file to Azure Blob Storage
+        zip_filename = f"{set_name}_{datetime.now().strftime('%Y%m%d%H%M%S')}.zip"
+        print(f"[INFO] Uploading ZIP file: {zip_filename}")
+        blob_client = BlobClient(
+            account_url=f"https://{os.getenv('AZURE_STORAGE_ACCOUNT_NAME')}.blob.core.windows.net",
+            container_name=os.getenv("AZURE_BLOB_CONTAINER_NAME"),
+            blob_name=zip_filename,
+            credential=os.getenv("AZURE_STORAGE_ACCOUNT_KEY")
+        )
+        blob_client.upload_blob(zip_buffer.getvalue(), overwrite=True)
+        zip_url = blob_client.url  # Get the URL of the uploaded zip file
+        print(f"[INFO] Uploaded ZIP file URL: {zip_url}")
+
+        # Insert the new set into the database
+        cursor = db.cursor()
+        cursor.execute(
+            "INSERT INTO `set` (name, qrcode_url, user_id) VALUES (%s, %s, %s)",
+            (set_name, zip_url, user_id)
+        )
+        set_id = cursor.lastrowid  # Get the ID of the newly created set
+        print(f"[INFO] Inserted new set with ID: {set_id}")
+
+        # Link thumbnails to the new set
+        for thumbnail_id in selected_thumbnails:
+            print(f"[INFO] Linking thumbnail {thumbnail_id} to set {set_id}")
+            cursor.execute(
+                "INSERT INTO set_images (set_id, image_id) VALUES (%s, %s)",
+                (set_id, thumbnail_id)
+            )
+        db.commit()
+        cursor.close()
+
+        # Create a RedirectResponse with a flash message
+        response = RedirectResponse(url="/dashboard", status_code=303)
+        response.set_cookie("flash_message", "Set created successfully.")
+        print("[INFO] Redirecting to /dashboard with success message")
+        return response
+
+    except Exception as e:
+        print(e)
+        print(f"[ERROR] An error occurred: {e}")
+        raise HTTPException(status_code=500, detail="An internal server error occurred")
