@@ -30,7 +30,6 @@ app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__
 # Include the API routes
 app.include_router(converter.converter)
 app.include_router(users.users)
-app.include_router(qrcode.qrcode)
 
 # Initialize templates
 templates = Jinja2Templates(directory="templates")

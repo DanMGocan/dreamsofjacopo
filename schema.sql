@@ -1,6 +1,7 @@
 CREATE DATABASE IF NOT EXISTS slidepull_main;
 USE slidepull_main;
 
+-- User Table
 CREATE TABLE user (
     user_id INT AUTO_INCREMENT PRIMARY KEY,
     email VARCHAR(255) NOT NULL UNIQUE,
@@ -34,22 +35,28 @@ CREATE TABLE image (
     FOREIGN KEY (pdf_id) REFERENCES pdf(pdf_id) ON DELETE CASCADE
 );
 
+-- Thumbnail Table
 CREATE TABLE thumbnail (
     thumbnail_id INT AUTO_INCREMENT PRIMARY KEY,
+    image_id INT NOT NULL,
     pdf_id INT NOT NULL,
     url VARCHAR(255) NOT NULL,
     sas_token VARCHAR(2048) NOT NULL,
     sas_token_expiry DATETIME NOT NULL,
-    FOREIGN KEY (pdf_id) REFERENCES pdf(pdf_id) ON DELETE CASCADE
+    FOREIGN KEY (pdf_id) REFERENCES pdf(pdf_id) ON DELETE CASCADE,
+    FOREIGN KEY (image_id) REFERENCES image(image_id) ON DELETE CASCADE
 );
-
 
 -- Set Table
 CREATE TABLE `set` (
     set_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255),
-    qrcode_url VARCHAR(512) NOT NULL,  -- Reduced length for QR code URL
     user_id INT,
+    sas_token VARCHAR(2048) NOT NULL,
+    sas_token_expiry DATETIME NOT NULL,
+    qrcode_url VARCHAR(512),  -- Reduced length for QR code URL
+    qrcode_sas_token VARCHAR(2048), -- SAS token for QR code
+    qrcode_sas_token_expiry DATETIME, -- Expiry of the QR code SAS token
     FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE
 );
 

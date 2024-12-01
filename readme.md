@@ -41,3 +41,6 @@ The API relies solely on the client to provide resource identifiers, which can b
 Make sure that access to resources is conditioned by the owner_id matching the owner of the resource id. 
 
 Need to check what is the story with background workers. 
+
+Link shortening service. 
+Failsafes for Azure - if file not in blob, give error but continue

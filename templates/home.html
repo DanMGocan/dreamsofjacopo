@@ -1,34 +1,45 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome</title>
-</head>
-<body>
-    <a href="/upload">Upload .pptx</a><br>
-    <a href="/registration">Register for new account</a><br>
-    <a href="/generateqr">Generate QR code</a><br>
+{% extends "base.html" %}
 
-    <p>Login with:</p>
+{% block title %}Home | SlidePull{% endblock %}
 
-    <form action="/login" method="post">
-        <label for="email">Email:</label>
-        <input type="email" name="email" id="email" required>
-        <br><br>
+{% block content %}
 
-        <label for="password">Password:</label>
-        <input type="password" name="password" id="password" required>
-        <br><br>
+    <!-- Main Content -->
+    <div class="container mt-5">
+        <div class="row">
+            <div class="col-lg-6 col-md-8 mx-auto">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h1 class="text-center mb-4">Welcome</h1>
 
-        <button type="submit">Login</button>
-    </form>
+                        <!-- Login Form -->
+                        <form action="/login" method="post" class="mb-4">
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Email:</label>
+                                <input type="email" name="email" id="email" class="form-control" placeholder="Enter your email" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="password" class="form-label">Password:</label>
+                                <input type="password" name="password" id="password" class="form-control" placeholder="Enter your password" required>
+                            </div>
+                            <div class="d-grid">
+                                <button type="submit" class="btn btn-success">Login</button>
+                            </div>
+                        </form>
 
-    <!-- Google Login (GET request) -->
-    <a href="/login/google">Login with Google</a><br>
+                        <p class="text-center">Or login with:</p>
+                        <!-- Social Login Buttons -->
+                        <div class="d-grid gap-2">
+                            <a href="/login/google" class="btn btn-outline-danger">Login with Google</a>
+                            <a href="/login/microsoft" class="btn btn-outline-primary">Login with Microsoft</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    <!-- Microsoft Login (GET request) -->
-    <a href="/login/microsoft">Login with Microsoft</a><br>
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
-</body>
-</html>
+    {% endblock %}

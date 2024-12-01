@@ -1,35 +1,49 @@
 import qrcode
-import os
+import io
+from helpers.blob_op import upload_to_blob
 
-def generate_qr_code(directory):
+def generate_qr(link_with_sas, user_alias, pdf_id):
+    """
+    Generates a QR code for the provided link and uploads it to Azure Blob Storage.
+
+    Args:
+        link_with_sas (str): The URL (with SAS token) for the ZIP file.
+        user_alias (str): The user's alias (for organizing the blob structure).
+        pdf_id (int): The ID of the presentation for organizing blob storage.
+
+    Returns:
+        tuple: (qr_code_url, qr_code_sas_token, qr_code_sas_token_expiry)
+    """
     try:
-        # Create the base URL (adjust based on your actual server/URL structure)
-        base_url = "http://127.0.0.1:8000/static/temp/"
-        
-        # Get the list of image URLs
-        image_files = os.listdir(directory)
-        if not image_files:
-            print(f"No images found in {directory}")
-            return None
+        # Generate QR code image
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(link_with_sas)
+        qr.make(fit=True)
 
-        image_urls = [f"{base_url}{file}" for file in image_files]
-        qr_data = "\n".join(image_urls)  # You can customize how you generate this URL list
-        print("QR data (URLs):", qr_data)
+        # Create an in-memory buffer for the image
+        qr_buffer = io.BytesIO()
+        qr_image = qr.make_image(fill_color="black", back_color="white")
+        qr_image.save(qr_buffer, format="PNG")
+        qr_buffer.seek(0)
 
-        # Generate the QR code from the image URLs
-        qr_img = qrcode.make(qr_data)
-        
-        # Ensure the 'qrcode' directory exists
-        output_dir = "static/qrcode"
-        os.makedirs(output_dir, exist_ok=True)
+        # Define the blob name for the QR code
+        qr_blob_name = f"{user_alias}/qrcodes/{pdf_id}_qr.png"
 
-        # Save the QR code image
-        qr_code_path = os.path.join(output_dir, "qr_code.png")
-        qr_img.save(qr_code_path)
-        print(f"QR code saved at {qr_code_path}")
-        
-        return f"/static/qrcode/qr_code.png"  # Return the path relative to the static directory
+        # Upload the QR code to Azure Blob Storage
+        qr_code_url, qr_code_sas_token, qr_code_sas_token_expiry = upload_to_blob(
+            blob_name=qr_blob_name,
+            file_content=qr_buffer.getvalue(),
+            content_type="image/png",
+            user_alias=user_alias,
+        )
+
+        return qr_code_url, qr_code_sas_token, qr_code_sas_token_expiry
 
     except Exception as e:
-        print(f"Error generating QR code: {e}")
-        return None
+        raise Exception(f"Failed to generate and upload QR code: {e}")
+

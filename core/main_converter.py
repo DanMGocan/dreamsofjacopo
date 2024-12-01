@@ -52,6 +52,11 @@ def convert_pptx_bytes_to_pdf(pptx_bytes, request: Request):
         raise Exception(f"Unexpected error: {e}")
 
 def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db):
+    # Adjust the quality of the image 
+    zoom_x = 2.0  # Horizontal scaling factor (e.g., 2.0 for 200% resolution)
+    zoom_y = 2.0  # Vertical scaling factor
+    matrix = fitz.Matrix(zoom_x, zoom_y)  # Create a scaling matrix
+
     try:
         cursor = db.cursor(dictionary=True, buffered=True)
 
@@ -81,7 +86,7 @@ def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db):
         # Convert each page to an image and upload
         for page_number in range(len(pdf_document)):
             page = pdf_document.load_page(page_number)
-            pix = page.get_pixmap()
+            pix = page.get_pixmap(matrix=matrix)  # Render the page with the scaling matrix
 
             # Get full-size image bytes
             image_bytes = pix.tobytes("png")
@@ -103,10 +108,10 @@ def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db):
             # Generate thumbnail
             # Calculate scaling factor
             scale = thumbnail_width / pix.width
-            # Create scaling matrix
-            matrix = fitz.Matrix(scale, scale)
+            # Create scaling matrix for thumbnail
+            thumbnail_matrix = fitz.Matrix(scale, scale)
             # Generate thumbnail pixmap using the matrix
-            thumbnail_pix = page.get_pixmap(matrix=matrix)
+            thumbnail_pix = page.get_pixmap(matrix=thumbnail_matrix)
             # Get thumbnail bytes
             thumbnail_bytes = thumbnail_pix.tobytes("png")
 
@@ -136,6 +141,7 @@ def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db):
         raise Exception(f"Error converting PDF to images: {e}")
     finally:
         cursor.close()
+
 
 
 

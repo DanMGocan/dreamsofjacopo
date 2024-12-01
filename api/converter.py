@@ -5,21 +5,23 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import RedirectResponse, HTMLResponse
 
 from helpers.flash_utils import set_flash_message
-from helpers.blob_op import generate_sas_token_for_file  # Import the SAS token generator
+from helpers.blob_op import generate_sas_token_for_file, upload_to_blob  # Import the SAS token generator
 from helpers.user_utils import get_user_data_from_session
+
 from core.main_converter import convert_pptx_bytes_to_pdf, convert_pdf_to_images
+from core.qr_generator import generate_qr
+
 from dotenv import load_dotenv
 from azure.storage.blob import BlobServiceClient, BlobClient
 from database_op.database import get_db
 import mysql.connector
 from mysql.connector import connection
-from mysql.connector.pooling import MySQLConnectionPool
 
+import logging
 import zipfile
-from typing import List
+from typing import List, Optional
 from pydantic import parse_obj_as
-import datetime
-
+from datetime import datetime, timedelta
 
 # Load environment variables
 load_dotenv()
@@ -140,75 +142,109 @@ async def upload_pptx(
         except:
             pass
 
+from azure.core.exceptions import ResourceNotFoundError
+
 @converter.post("/delete-presentation/{pdf_id}")
 async def delete_presentation(
     pdf_id: int,
     request: Request,
     db: mysql.connector.connection.MySQLConnection = Depends(get_db)
 ):
-    # Ensure the user is logged in
     if 'user_id' not in request.session:
         return RedirectResponse(url="/login")
 
     user_id = request.session['user_id']
 
-    # Fetch the presentation, including the SAS token and blob URL
-    cursor = db.cursor(dictionary=True, buffered=True)
-    cursor.execute("""
-        SELECT url, sas_token, user_id 
-        FROM pdf 
-        WHERE pdf_id = %s
-    """, (pdf_id,))
-    presentation = cursor.fetchone()
+    try:
+        # Fetch the presentation, including the SAS token and blob URL
+        cursor = db.cursor(dictionary=True, buffered=True)
+        cursor.execute("""
+            SELECT url, sas_token, user_id 
+            FROM pdf 
+            WHERE pdf_id = %s
+        """, (pdf_id,))
+        presentation = cursor.fetchone()
 
-    if not presentation:
-        raise HTTPException(status_code=404, detail="Presentation not found")
+        if not presentation:
+            raise HTTPException(status_code=404, detail="Presentation not found")
 
-    # Ensure the presentation belongs to the current user
-    if presentation['user_id'] != user_id:
-        raise HTTPException(status_code=403, detail="You are not authorized to delete this presentation")
+        if presentation['user_id'] != user_id:
+            raise HTTPException(status_code=403, detail="You are not authorized to delete this presentation")
 
-    # Use the URL with the SAS token to delete the PDF file from Azure Blob Storage
-    pdf_blob_url_with_sas = f"{presentation['url']}?{presentation['sas_token']}"
-    blob_client = BlobClient.from_blob_url(pdf_blob_url_with_sas)
-    blob_client.delete_blob()
+        # Delete the PDF file from Azure Blob Storage
+        pdf_blob_url_with_sas = f"{presentation['url']}?{presentation['sas_token']}"
+        try:
+            blob_client = BlobClient.from_blob_url(pdf_blob_url_with_sas)
+            blob_client.delete_blob()
+        except ResourceNotFoundError:
+            print(f"Blob already deleted: {pdf_blob_url_with_sas}")
 
-    # Delete all associated images from Azure Blob Storage
-    cursor.execute("SELECT url, sas_token FROM image WHERE pdf_id = %s", (pdf_id,))
-    images = cursor.fetchall()
+        # Delete all associated images from Azure Blob Storage
+        cursor.execute("SELECT url, sas_token FROM image WHERE pdf_id = %s", (pdf_id,))
+        images = cursor.fetchall()
+        for image in images:
+            try:
+                image_blob_url_with_sas = f"{image['url']}?{image['sas_token']}"
+                image_blob_client = BlobClient.from_blob_url(image_blob_url_with_sas)
+                image_blob_client.delete_blob()
+            except ResourceNotFoundError:
+                print(f"Image blob already deleted: {image_blob_url_with_sas}")
 
-    for image in images:
-        image_blob_url_with_sas = f"{image['url']}?{image['sas_token']}"
-        image_blob_client = BlobClient.from_blob_url(image_blob_url_with_sas)
-        image_blob_client.delete_blob()
+        # Delete all associated thumbnails from Azure Blob Storage
+        cursor.execute("SELECT url, sas_token FROM thumbnail WHERE pdf_id = %s", (pdf_id,))
+        thumbnails = cursor.fetchall()
+        for thumbnail in thumbnails:
+            try:
+                thumbnail_blob_url_with_sas = f"{thumbnail['url']}?{thumbnail['sas_token']}"
+                thumbnail_blob_client = BlobClient.from_blob_url(thumbnail_blob_url_with_sas)
+                thumbnail_blob_client.delete_blob()
+            except ResourceNotFoundError:
+                print(f"Thumbnail blob already deleted: {thumbnail_blob_url_with_sas}")
 
-    # Delete all associated thumbnails from Azure Blob Storage
-    cursor.execute("SELECT url, sas_token FROM thumbnail WHERE pdf_id = %s", (pdf_id,))
-    thumbnails = cursor.fetchall()
+        # Delete associated folders (qr_codes and sets)
+        try:
+            qr_code_folder_path = f"{user_id}/qr_codes/{pdf_id}"
+            qr_code_container_client = BlobClient(
+                account_url=f"https://{os.getenv('AZURE_STORAGE_ACCOUNT_NAME')}.blob.core.windows.net",
+                container_name=os.getenv("AZURE_BLOB_CONTAINER_NAME"),
+                blob_name=qr_code_folder_path,
+                credential=os.getenv("AZURE_STORAGE_ACCOUNT_KEY")
+            )
+            qr_code_container_client.delete_blob()
+        except ResourceNotFoundError:
+            print(f"QR code folder already deleted: {qr_code_folder_path}")
 
-    for thumbnail in thumbnails:
-        thumbnail_blob_url_with_sas = f"{thumbnail['url']}?{thumbnail['sas_token']}"
-        thumbnail_blob_client = BlobClient.from_blob_url(thumbnail_blob_url_with_sas)
-        thumbnail_blob_client.delete_blob()
+        try:
+            set_folder_path = f"{user_id}/sets/{pdf_id}"
+            set_container_client = BlobClient(
+                account_url=f"https://{os.getenv('AZURE_STORAGE_ACCOUNT_NAME')}.blob.core.windows.net",
+                container_name=os.getenv("AZURE_BLOB_CONTAINER_NAME"),
+                blob_name=set_folder_path,
+                credential=os.getenv("AZURE_STORAGE_ACCOUNT_KEY")
+            )
+            set_container_client.delete_blob()
+        except ResourceNotFoundError:
+            print(f"Set folder already deleted: {set_folder_path}")
 
-    # Delete the PDF, images, and thumbnails from the database
-    cursor.execute("DELETE FROM image WHERE pdf_id = %s", (pdf_id,))
-    cursor.execute("DELETE FROM thumbnail WHERE pdf_id = %s", (pdf_id,))
-    cursor.execute("DELETE FROM pdf WHERE pdf_id = %s", (pdf_id,))
+        # Delete database records
+        cursor.execute("DELETE FROM image WHERE pdf_id = %s", (pdf_id,))
+        cursor.execute("DELETE FROM thumbnail WHERE pdf_id = %s", (pdf_id,))
+        cursor.execute("DELETE FROM `set` WHERE user_id = %s AND `name` LIKE %s", (user_id, f"%{pdf_id}%"))
+        cursor.execute("DELETE FROM pdf WHERE pdf_id = %s", (pdf_id,))
+        db.commit()
 
-    db.commit()
+        response = RedirectResponse(url="/dashboard", status_code=303)
+        set_flash_message(response, "Presentation, associated files, and folders deleted successfully.")
+        return response
 
-    # Close the cursor after the operation
-    cursor.close()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"An internal server error occurred: {e}")
 
-    # Create a RedirectResponse first
-    response = RedirectResponse(url="/dashboard", status_code=303)
+    finally:
+        cursor.close()
 
-    # Set a flash message indicating the presentation and associated files were deleted
-    set_flash_message(response, "Presentation and all associated files deleted successfully")
 
-    # Return the response with the flash message
-    return response
 
 @converter.get("/select-slides/{pdf_id}", response_class=HTMLResponse)
 async def select_thumbnails(
@@ -233,121 +269,168 @@ async def select_thumbnails(
         "thumbnails": thumbnails
     })
 
+import logging
+
 @converter.post("/generate-set/{pdf_id}", response_class=HTMLResponse)
-async def generate_set(
+def generate_set(
     pdf_id: int,
     request: Request,
-    selected_thumbnails: List[str] = Form(...),
+    selected_thumbnails: Optional[List[str]] = Form(None),
     set_name: str = Form(...),
     db: mysql.connector.MySQLConnection = Depends(get_db),
 ):
-    print("[DEBUG] Entering generate_set endpoint")
-    print(f"[DEBUG] PDF ID: {pdf_id}")
+    logging.info("Entered generate_set endpoint")
 
-    # Check session validity before any operations
+    # Check if the user is logged in
     if 'user_id' not in request.session:
-        print("[DEBUG] User is not logged in")
-        return RedirectResponse(url="/login")
+        logging.warning("User not logged in, redirecting to login page")
+        return RedirectResponse(url="/login", status_code=303)
 
-    print("[DEBUG] User is logged in")
-    """
-    Handles the selection of thumbnails, zipping them, uploading to Azure Blob Storage,
-    and storing metadata in the database.
+    if not selected_thumbnails:
+        logging.error("No thumbnails were selected")
+        raise HTTPException(status_code=400, detail="No thumbnails selected.")
 
-    Args:
-        pdf_id (int): The ID of the PDF for which thumbnails are selected.
-        request (Request): FastAPI request object.
-        selected_thumbnails (List[str]): IDs of selected thumbnails from the form.
-        set_name (str): User-provided name for the set.
-        db (mysql.connector.MySQLConnection): MySQL database connection.
-
-    Returns:
-        RedirectResponse: Redirect to the created set's page.
-    """
     try:
-        print(f"[INFO] Processing PDF ID: {pdf_id}")
-        print(f"[INFO] Selected thumbnails: {selected_thumbnails}")
-        print(f"[INFO] Set name: {set_name}")
-
-        # Convert selected thumbnails from List[str] to List[int]
-        selected_thumbnails = parse_obj_as(List[int], selected_thumbnails)
-
-        # Ensure the user is logged in
-        if 'user_id' not in request.session:
-            print("[ERROR] User not logged in")
-            return RedirectResponse(url="/login")
-
-        # Get the logged-in user's ID from the session
+        # Parse inputs
+        selected_thumbnail_ids = parse_obj_as(List[int], selected_thumbnails)
         user_id = request.session['user_id']
-        print(f"[INFO] User ID: {user_id}")
+        logging.info(f"User ID: {user_id}")
+        logging.info(f"Selected thumbnails: {selected_thumbnail_ids}")
 
-        # Fetch selected thumbnails from the database
+        # Fetch the user's alias
         cursor = db.cursor(dictionary=True)
-        query = "SELECT url, sas_token FROM thumbnail WHERE thumbnail_id IN (%s)" % ",".join(map(str, selected_thumbnails))
-        print(f"[INFO] Executing query: {query}")
-        cursor.execute(query)
-        thumbnails = cursor.fetchall()
+        cursor.execute("SELECT alias FROM user WHERE user_id = %s", (user_id,))
+        user_data = cursor.fetchone()
         cursor.close()
 
-        if not thumbnails:
-            print("[WARNING] No valid thumbnails found for the given IDs.")
-            raise HTTPException(status_code=404, detail="No valid thumbnails selected.")
+        if not user_data or 'alias' not in user_data:
+            logging.error("User alias not found")
+            raise HTTPException(status_code=404, detail="User alias not found.")
+        user_alias = user_data['alias']
+        logging.info(f"User alias: {user_alias}")
+
+        # Fetch the full-size images corresponding to the selected thumbnails
+        logging.info("Fetching full-size images for selected thumbnails...")
+        cursor = db.cursor(dictionary=True)
+        format_strings = ','.join(['%s'] * len(selected_thumbnail_ids))
+        query = f"""
+            SELECT image.url, image.sas_token
+            FROM image
+            INNER JOIN thumbnail ON image.image_id = thumbnail.image_id
+            WHERE thumbnail.thumbnail_id IN ({format_strings})
+        """
+        cursor.execute(query, tuple(selected_thumbnail_ids))
+        images = cursor.fetchall()
+        cursor.close()
+
+        logging.info(f"Number of images fetched: {len(images)}")
+
+        if not images:
+            logging.error("No valid images found for selected thumbnails")
+            raise HTTPException(status_code=404, detail="No valid images found for selected thumbnails.")
 
         # Create a zip file in memory
+        logging.info("Creating ZIP file for the selected images...")
         zip_buffer = io.BytesIO()
         with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
-            for thumbnail in thumbnails:
-                print(f"[INFO] Downloading thumbnail: {thumbnail['url']}")
-                # Fetch the image from Azure Blob Storage
-                blob_client = BlobClient.from_blob_url(f"{thumbnail['url']}?{thumbnail['sas_token']}")
-                blob_data = blob_client.download_blob().readall()
+            for idx, image in enumerate(images):
+                try:
+                    image_url = f"{image['url']}?{image['sas_token']}"
+                    logging.info(f"Downloading image {idx + 1}/{len(images)}: {image_url}")
+                    # Download the image data
+                    blob_client = BlobClient.from_blob_url(image_url)
+                    downloader = blob_client.download_blob(timeout=30)
+                    blob_data = downloader.readall()
 
-                # Add the image to the zip file
-                filename = os.path.basename(thumbnail['url'])
-                zip_file.writestr(filename, blob_data)
+                    # Add the image to the zip file
+                    filename = os.path.basename(image['url'])
+                    zip_file.writestr(filename, blob_data)
+                    logging.info(f"Added image to ZIP: {filename}")
+                except Exception as e:
+                    logging.error(f"Error downloading image {image_url}: {e}")
+                    raise Exception(f"Failed to process image: {image_url}")
 
         zip_buffer.seek(0)
-        print("[INFO] Successfully created ZIP archive in memory")
+        logging.info("ZIP file created successfully")
 
-        # Upload the zip file to Azure Blob Storage
+        # Define the blob name for the ZIP file
         zip_filename = f"{set_name}_{datetime.now().strftime('%Y%m%d%H%M%S')}.zip"
-        print(f"[INFO] Uploading ZIP file: {zip_filename}")
-        blob_client = BlobClient(
-            account_url=f"https://{os.getenv('AZURE_STORAGE_ACCOUNT_NAME')}.blob.core.windows.net",
-            container_name=os.getenv("AZURE_BLOB_CONTAINER_NAME"),
-            blob_name=zip_filename,
-            credential=os.getenv("AZURE_STORAGE_ACCOUNT_KEY")
+        zip_blob_path = f"{user_alias}/sets/{pdf_id}/{zip_filename}"
+
+        # Upload the ZIP file to blob storage
+        logging.info(f"Uploading ZIP file to blob storage: {zip_blob_path}")
+        zip_content = zip_buffer.getvalue()
+        zip_url, zip_sas_token, zip_sas_token_expiry = upload_to_blob(
+            blob_name=zip_blob_path,
+            file_content=zip_content,
+            content_type="application/zip",
+            user_alias=user_alias
         )
-        blob_client.upload_blob(zip_buffer.getvalue(), overwrite=True)
-        zip_url = blob_client.url  # Get the URL of the uploaded zip file
-        print(f"[INFO] Uploaded ZIP file URL: {zip_url}")
+        logging.info(f"ZIP file uploaded successfully: {zip_url}")
+
+        # Generate QR code for the ZIP file
+        logging.info("Generating QR code for the ZIP file")
+        link_with_sas = f"{zip_url}?{zip_sas_token}"
+        qr_code_url, qr_code_sas_token, qr_code_sas_token_expiry = generate_qr(
+            link_with_sas=link_with_sas,
+            user_alias=user_alias,
+            pdf_id=pdf_id
+        )
+        logging.info(f"QR code generated successfully: {qr_code_url}")
 
         # Insert the new set into the database
+        logging.info("Inserting new set into the database")
         cursor = db.cursor()
         cursor.execute(
-            "INSERT INTO `set` (name, qrcode_url, user_id) VALUES (%s, %s, %s)",
-            (set_name, zip_url, user_id)
-        )
-        set_id = cursor.lastrowid  # Get the ID of the newly created set
-        print(f"[INFO] Inserted new set with ID: {set_id}")
-
-        # Link thumbnails to the new set
-        for thumbnail_id in selected_thumbnails:
-            print(f"[INFO] Linking thumbnail {thumbnail_id} to set {set_id}")
-            cursor.execute(
-                "INSERT INTO set_images (set_id, image_id) VALUES (%s, %s)",
-                (set_id, thumbnail_id)
+            """
+            INSERT INTO `set`
+            (name, qrcode_url, qrcode_sas_token, qrcode_sas_token_expiry, sas_token, sas_token_expiry, user_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """,
+            (
+                set_name,
+                qr_code_url,
+                qr_code_sas_token,
+                qr_code_sas_token_expiry,
+                zip_sas_token,
+                zip_sas_token_expiry,
+                user_id
             )
+        )
+        set_id = cursor.lastrowid
+        logging.info(f"Set inserted with ID: {set_id}")
+
+        # Link thumbnails to the set
+        logging.info("Linking thumbnails to the set")
+        format_strings = ','.join(['(%s, %s)'] * len(selected_thumbnail_ids))
+        values = []
+        for thumbnail_id in selected_thumbnail_ids:
+            values.extend([set_id, thumbnail_id])
+
+        cursor.execute(
+            f"INSERT INTO set_images (set_id, image_id) VALUES {format_strings}",
+            tuple(values)
+        )
         db.commit()
         cursor.close()
+        logging.info("Thumbnails linked to the set successfully")
 
         # Create a RedirectResponse with a flash message
         response = RedirectResponse(url="/dashboard", status_code=303)
         response.set_cookie("flash_message", "Set created successfully.")
-        print("[INFO] Redirecting to /dashboard with success message")
+        logging.info("Redirecting to dashboard with success message")
         return response
 
     except Exception as e:
-        print(e)
-        print(f"[ERROR] An error occurred: {e}")
+        logging.exception("Error generating set")
+        db.rollback()
         raise HTTPException(status_code=500, detail="An internal server error occurred")
+
+
+
+
+
+
+
+
+
