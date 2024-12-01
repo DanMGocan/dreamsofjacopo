@@ -15,7 +15,7 @@ CREATE TABLE user (
 
 -- PDF Table
 CREATE TABLE pdf (
-    pdf_id INT AUTO_INCREMENT PRIMARY KEY,
+    pdf_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     user_id INT,
     url VARCHAR(512) NOT NULL,  -- Reduced length for URL
     original_filename VARCHAR(255),
@@ -26,7 +26,7 @@ CREATE TABLE pdf (
 
 -- Image Table
 CREATE TABLE image (
-    image_id INT AUTO_INCREMENT PRIMARY KEY,
+    image_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     pdf_id INT,
     url VARCHAR(512) NOT NULL,  -- Reduced length for URL
     uploaded_on DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -37,7 +37,7 @@ CREATE TABLE image (
 
 -- Thumbnail Table
 CREATE TABLE thumbnail (
-    thumbnail_id INT AUTO_INCREMENT PRIMARY KEY,
+    thumbnail_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     image_id INT NOT NULL,
     pdf_id INT NOT NULL,
     url VARCHAR(255) NOT NULL,
@@ -49,7 +49,8 @@ CREATE TABLE thumbnail (
 
 -- Set Table
 CREATE TABLE `set` (
-    set_id INT AUTO_INCREMENT PRIMARY KEY,
+    set_id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    pdf_id INT NOT NULL,
     name VARCHAR(255),
     user_id INT,
     sas_token VARCHAR(2048) NOT NULL,
@@ -57,20 +58,10 @@ CREATE TABLE `set` (
     qrcode_url VARCHAR(512),  -- Reduced length for QR code URL
     qrcode_sas_token VARCHAR(2048), -- SAS token for QR code
     qrcode_sas_token_expiry DATETIME, -- Expiry of the QR code SAS token
-    FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE
-);
-
--- Images_per_set Table (Join Table)
-CREATE TABLE set_images (
-    set_id INT,
-    image_id INT,
-    PRIMARY KEY (set_id, image_id),
-    FOREIGN KEY (set_id) REFERENCES `set`(set_id) ON DELETE CASCADE,
-    FOREIGN KEY (image_id) REFERENCES image(image_id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (pdf_id) REFERENCES pdf(pdf_id) ON DELETE CASCADE
 );
 
 -- Add indexes for faster query performance on critical fields
 CREATE INDEX idx_user_id ON pdf(user_id);
 CREATE INDEX idx_pdf_id ON image(pdf_id);
-CREATE INDEX idx_set_id ON set_images(set_id);
-CREATE INDEX idx_image_id ON set_images(image_id);

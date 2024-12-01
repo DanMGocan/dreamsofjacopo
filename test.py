@@ -16,7 +16,9 @@ def convert_pptx_to_pdf(pptx_path, output_dir):
 
         # Get LibreOffice path
         soffice_path = os.getenv("SOFFICE_PATH", r'C:\Program Files\LibreOffice\program\soffice.exe')
-        
+  
+
+
         # Run LibreOffice command to convert PPTX to PDF
         subprocess.run([soffice_path, '--headless', '--convert-to', 'pdf', pptx_path, '--outdir', output_dir], check=True, timeout=120)
 

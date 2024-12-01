@@ -104,6 +104,7 @@ def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db):
                 "INSERT INTO image (pdf_id, url, sas_token, sas_token_expiry) VALUES (%s, %s, %s, %s)",
                 (pdf_id, image_url, sas_token_image, sas_token_expiry)
             )
+            image_id = cursor.lastrowid  # Get the inserted image_id
 
             # Generate thumbnail
             # Calculate scaling factor
@@ -125,8 +126,8 @@ def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db):
 
             # Insert thumbnail record into database
             cursor.execute(
-                "INSERT INTO thumbnail (pdf_id, url, sas_token, sas_token_expiry) VALUES (%s, %s, %s, %s)",
-                (pdf_id, thumbnail_url, sas_token_thumbnail, sas_token_thumbnail_expiry)
+                "INSERT INTO thumbnail (image_id, pdf_id, url, sas_token, sas_token_expiry) VALUES (%s, %s, %s, %s, %s)",
+                (image_id, pdf_id, thumbnail_url, sas_token_thumbnail, sas_token_thumbnail_expiry)
             )
 
         db.commit()
@@ -141,6 +142,7 @@ def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db):
         raise Exception(f"Error converting PDF to images: {e}")
     finally:
         cursor.close()
+
 
 
 

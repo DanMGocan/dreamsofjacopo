@@ -19,7 +19,7 @@ AZURE_STORAGE_ACCOUNT_NAME = os.getenv("AZURE_STORAGE_ACCOUNT_NAME")
 AZURE_STORAGE_ACCOUNT_KEY = os.getenv("AZURE_STORAGE_ACCOUNT_KEY")
 AZURE_BLOB_CONTAINER_NAME = os.getenv("AZURE_BLOB_CONTAINER_NAME")
 
-def generate_sas_token_for_file(alias, file_path, current_sas_token=None, sas_token_expiry=None):
+def generate_sas_token_for_file(alias, file_path, current_sas_token=None, sas_token_expiry=None, content_disposition=None):
     # Check if the current SAS token is still valid
     if current_sas_token and sas_token_expiry and datetime.utcnow().replace(tzinfo=timezone.utc) < sas_token_expiry:
         print(f"Using existing SAS token for file '{file_path}'")
@@ -40,11 +40,14 @@ def generate_sas_token_for_file(alias, file_path, current_sas_token=None, sas_to
         blob_name=blob_name,  # Blob name with alias included correctly
         account_key=AZURE_STORAGE_ACCOUNT_KEY,  # Storage account key for authentication
         permission=BlobSasPermissions(read=True, write=True, delete=True),  # Permissions
-        expiry=expiry_time  # Set expiry time
+        expiry=expiry_time,  # Set expiry time
+        content_disposition=content_disposition  # Include content_disposition if provided
     )
 
     print(f"Generated new SAS Token for file '{blob_name}': {sas_token}")
     return sas_token, expiry_time
+
+
 
 def upload_presentation():
     pass 
@@ -61,12 +64,13 @@ def upload_thumbnails():
 def upload_zip():
     pass 
 
-def upload_to_blob(blob_name, file_content, content_type, user_alias):
+def upload_to_blob(blob_name, file_content, content_type, user_alias, content_disposition=None):
     try:
-        # Generate SAS token for the specific image blob
+        # Generate SAS token for the specific blob
         sas_token_image, sas_token_expiry = generate_sas_token_for_file(
             alias=user_alias,
-            file_path=blob_name
+            file_path=blob_name,
+            content_disposition=content_disposition  # Pass content_disposition
         )
 
         # Construct the base blob URL without the SAS token
@@ -86,16 +90,11 @@ def upload_to_blob(blob_name, file_content, content_type, user_alias):
             content_settings=ContentSettings(content_type=content_type)
         )
 
-        # Construct and return the Blob URL without the SAS token
-        blob_url = f"https://{AZURE_STORAGE_ACCOUNT_NAME}.blob.core.windows.net/{AZURE_BLOB_CONTAINER_NAME}/{blob_name}"
-        print(f"Blob Name: {blob_name}")
-        print(f"SAS Token: {sas_token_image}")
-        print(f"Blob URL with SAS: {blob_url_with_sas}")
-        
-        
+        # Return the blob URL, SAS token, and expiry time
         return blob_url, sas_token_image, sas_token_expiry
     except Exception as e:
         raise Exception(f"Failed to upload blob: {e}")
+
 
 
 

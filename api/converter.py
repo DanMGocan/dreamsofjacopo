@@ -369,26 +369,30 @@ def generate_set(
         logging.info(f"ZIP file uploaded successfully: {zip_url}")
 
         # Generate QR code for the ZIP file
+        # Generate QR code for the ZIP file
         logging.info("Generating QR code for the ZIP file")
         link_with_sas = f"{zip_url}?{zip_sas_token}"
         qr_code_url, qr_code_sas_token, qr_code_sas_token_expiry = generate_qr(
             link_with_sas=link_with_sas,
             user_alias=user_alias,
-            pdf_id=pdf_id
+            pdf_id=pdf_id,
+            set_name=set_name  # Pass the set name
         )
+
         logging.info(f"QR code generated successfully: {qr_code_url}")
 
-        # Insert the new set into the database
+        # Insert the new set into the database, including pdf_id
         logging.info("Inserting new set into the database")
         cursor = db.cursor()
         cursor.execute(
             """
             INSERT INTO `set`
-            (name, qrcode_url, qrcode_sas_token, qrcode_sas_token_expiry, sas_token, sas_token_expiry, user_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s)
+            (name, pdf_id, qrcode_url, qrcode_sas_token, qrcode_sas_token_expiry, sas_token, sas_token_expiry, user_id)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 set_name,
+                pdf_id,
                 qr_code_url,
                 qr_code_sas_token,
                 qr_code_sas_token_expiry,
@@ -397,23 +401,9 @@ def generate_set(
                 user_id
             )
         )
-        set_id = cursor.lastrowid
-        logging.info(f"Set inserted with ID: {set_id}")
-
-        # Link thumbnails to the set
-        logging.info("Linking thumbnails to the set")
-        format_strings = ','.join(['(%s, %s)'] * len(selected_thumbnail_ids))
-        values = []
-        for thumbnail_id in selected_thumbnail_ids:
-            values.extend([set_id, thumbnail_id])
-
-        cursor.execute(
-            f"INSERT INTO set_images (set_id, image_id) VALUES {format_strings}",
-            tuple(values)
-        )
         db.commit()
         cursor.close()
-        logging.info("Thumbnails linked to the set successfully")
+        logging.info("Set inserted into the database successfully")
 
         # Create a RedirectResponse with a flash message
         response = RedirectResponse(url="/dashboard", status_code=303)
@@ -425,9 +415,6 @@ def generate_set(
         logging.exception("Error generating set")
         db.rollback()
         raise HTTPException(status_code=500, detail="An internal server error occurred")
-
-
-
 
 
 

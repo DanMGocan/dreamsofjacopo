@@ -40,7 +40,6 @@ async def upload_form(request: Request):
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request, db: mysql.connector.connection.MySQLConnection = Depends(get_db)):
-
     # Ensure the user is logged in
     if 'email' not in request.session:
         return RedirectResponse(url="/login")
@@ -55,14 +54,49 @@ async def dashboard(request: Request, db: mysql.connector.connection.MySQLConnec
     # Check if there's a flash message to display
     flash_message = get_flash_message(request)
 
-    # Fetch user's uploaded presentations from the database, including pdf_id
     cursor = db.cursor(dictionary=True)
+
+    # Fetch presentations and associated sets using LEFT JOIN
     cursor.execute("""
-        SELECT pdf_id, original_filename, url, sas_token_expiry AS uploaded_on 
-        FROM pdf 
-        WHERE user_id = %s
+        SELECT pdf.pdf_id, pdf.original_filename, pdf.url, pdf.sas_token_expiry AS uploaded_on,
+               `set`.set_id, `set`.name AS set_name, `set`.qrcode_url, `set`.qrcode_sas_token
+        FROM pdf
+        LEFT JOIN `set` ON pdf.pdf_id = `set`.pdf_id
+        WHERE pdf.user_id = %s
+        ORDER BY pdf.pdf_id
     """, (user_id,))
-    presentations = cursor.fetchall()
+
+    rows = cursor.fetchall()
+
+    # Organize data into presentations with their sets
+    presentations = []
+    presentation_dict = {}
+    for row in rows:
+        pdf_id = row['pdf_id']
+        if pdf_id not in presentation_dict:
+            # New presentation
+            presentation = {
+                'pdf_id': pdf_id,
+                'original_filename': row['original_filename'],
+                'url': row['url'],
+                'uploaded_on': row['uploaded_on'],
+                'sets': []
+            }
+            presentation_dict[pdf_id] = presentation
+            presentations.append(presentation)
+        else:
+            presentation = presentation_dict[pdf_id]
+
+        # Add set if it exists
+        if row['set_id'] is not None:
+            # Construct the full QR code URL with SAS token
+            qrcode_url_with_sas = f"{row['qrcode_url']}?{row['qrcode_sas_token']}"
+            presentation['sets'].append({
+                'set_id': row['set_id'],
+                'name': row['set_name'],
+                'qrcode_url_with_sas': qrcode_url_with_sas
+            })
+
     cursor.close()
 
     # Render the dashboard template with all the user and presentation data

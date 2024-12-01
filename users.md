@@ -30,3 +30,5 @@ Have a mechanism to regenerate SAS Tokens on request
 Ask for first name, last name, email address
 
 Add proper support email address for replying
+
+To delete sets and qr codes on presentation delete 
