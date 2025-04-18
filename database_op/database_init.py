@@ -65,8 +65,8 @@ def initialize_database():
 
         # Now insert the test user
         # Use the same password hashing as the application
-        test_email = 'sad@sad.sad'
-        test_password = '123'  # Plain text password for the test account
+        test_email = 'admin@slidepull.net'
+        test_password = 'slidepull'  # Plain text password for the test account
         hashed_password = bcrypt.hashpw(test_password.encode('utf-8'), bcrypt.gensalt())
 
         # Prepare the insert statement

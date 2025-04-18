@@ -1,72 +1,337 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Select Thumbnails</title>
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Optional Custom CSS -->
-    <link href="/static/css/styles.css" rel="stylesheet">
-</head>
-<body>
-    <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="/">My Web App</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item"><a class="nav-link" href="/">Home</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/logout">Logout</a></li>
-                </ul>
+{% extends "base.html" %}
+
+{% block title %}Select Slides | SlidePull{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-lg-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Select Slides</li>
+            </ol>
+        </nav>
+        
+        <div class="card">
+            <div class="card-header bg-white">
+                <h1 class="h3 mb-0 section-title">
+                    <i class="fas fa-images me-2"></i> Select Slides
+                </h1>
             </div>
-        </div>
-    </nav>
-
-    <!-- Main Content -->
-    <div class="container mt-4">
-        <h1 class="text-center mb-4">Select Thumbnails for Presentation ID: {{ pdf_id }}</h1>
-
-        <form action="/generate-set/{{ pdf_id }}" method="POST">
-            {% if thumbnails %}
-                <div class="row g-3">
-                    {% for thumbnail in thumbnails %}
-                        <div class="col-6 col-sm-4 col-md-3 col-lg-2 text-center">
-                            <div class="card">
-                                <img src="{{ thumbnail.url }}?{{ thumbnail.sas_token }}" alt="Thumbnail" class="card-img-top img-thumbnail">
-                                <div class="card-body">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" name="selected_thumbnails" value="{{ thumbnail.thumbnail_id }}" id="thumb-{{ thumbnail.thumbnail_id }}">
-                                        <label class="form-check-label" for="thumb-{{ thumbnail.thumbnail_id }}">Select</label>
+            <div class="card-body">
+                <p class="lead mb-4">
+                    Select the slides you want to include in your set. These slides will be accessible via the QR code you'll generate.
+                </p>
+                
+                <form action="/generate-set/{{ pdf_id }}" method="POST">
+                    {% if thumbnails %}
+                        <!-- Slide Selection Controls -->
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <div>
+                                <button type="button" class="btn btn-outline-primary btn-sm me-2" id="selectAll">
+                                    <i class="fas fa-check-square me-1"></i> Select All
+                                </button>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" id="deselectAll">
+                                    <i class="fas fa-square me-1"></i> Deselect All
+                                </button>
+                            </div>
+                            <div class="text-muted small">
+                                <span id="selectedCount">0</span> of {{ thumbnails|length }} slides selected
+                            </div>
+                        </div>
+                        
+                        <!-- Thumbnails Grid -->
+                        <div class="row g-3 mb-4">
+                            {% for thumbnail in thumbnails %}
+                                <div class="col-6 col-sm-4 col-md-3 col-lg-2 text-center">
+                                    <div class="card thumbnail-card h-100" data-thumbnail-id="{{ thumbnail.thumbnail_id }}">
+                                        <div class="position-relative">
+                                            <img src="{{ thumbnail.url }}?{{ thumbnail.sas_token }}" 
+                                                 alt="Slide {{ loop.index }}" 
+                                                 class="card-img-top img-thumbnail">
+                                            <div class="position-absolute top-0 end-0 p-2">
+                                                <span class="badge bg-dark">{{ loop.index }}</span>
+                                            </div>
+                                        </div>
+                                        <div class="card-body p-2">
+                                            <div class="form-check">
+                                                <input class="form-check-input slide-checkbox" 
+                                                       type="checkbox" 
+                                                       name="selected_thumbnails" 
+                                                       value="{{ thumbnail.thumbnail_id }}" 
+                                                       id="thumb-{{ thumbnail.thumbnail_id }}">
+                                                <label class="form-check-label" for="thumb-{{ thumbnail.thumbnail_id }}">
+                                                    Include this slide
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                        
+                        <!-- Set Name and Submit -->
+                        <div class="card bg-light-gray mb-4">
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-8">
+                                        <div class="mb-3 mb-md-0">
+                                            <label for="set_name" class="form-label">Set Name:</label>
+                                            <input type="text" id="set_name" name="set_name" 
+                                                   class="form-control" 
+                                                   placeholder="Enter a descriptive name for this set" 
+                                                   pattern="[A-Za-z0-9_-]+" 
+                                                   title="No spaces allowed. Use letters, numbers, underscores or hyphens only."
+                                                   required>
+                                            <div class="form-text text-danger">
+                                                <strong>Important:</strong> No spaces allowed. Use letters, numbers, underscores or hyphens only.
+                                            </div>
+                                            <div class="form-text" id="set_name_preview">
+                                                Preview: <span id="name_preview"></span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4 d-flex align-items-end">
+                                        <button type="submit" class="btn btn-primary w-100" id="generateBtn">
+                                            <i class="fas fa-qrcode me-1"></i> Generate QR Code
+                                        </button>
                                     </div>
                                 </div>
                             </div>
                         </div>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <div class="alert alert-warning text-center" role="alert">
-                    No thumbnails found for this presentation.
-                </div>
-            {% endif %}
-
-            <!-- Set Name -->
-            <div class="mt-4">
-                <label for="set_name" class="form-label">Set Name:</label>
-                <input type="text" id="set_name" name="set_name" class="form-control" placeholder="Enter a set name" required>
+                    {% else %}
+                        <div class="alert alert-warning text-center" role="alert">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            No thumbnails found for this presentation.
+                            <p class="mb-0 mt-2">
+                                <a href="/dashboard" class="alert-link">Return to dashboard</a>
+                            </p>
+                        </div>
+                    {% endif %}
+                </form>
             </div>
-
-            <!-- Submit Button -->
-            <div class="mt-3 text-center">
-                <button type="submit" class="btn btn-primary">Generate QR Code</button>
-            </div>
-        </form>
+        </div>
     </div>
+</div>
 
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+<!-- Loading Overlay -->
+<div id="loadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-75 d-none" style="z-index: 9999;">
+    <div class="position-absolute top-50 start-50 translate-middle text-center text-white">
+        <div class="spinner-border mb-3" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+        <h4 id="loadingMessage">Processing slides...</h4>
+        <div class="progress mt-3" style="width: 300px; height: 25px;">
+            <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+        </div>
+        <p id="progressText" class="mt-2">0 of 0 slides processed</p>
+    </div>
+</div>
+
+<!-- JavaScript for thumbnail selection -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const checkboxes = document.querySelectorAll('.slide-checkbox');
+        const thumbnailCards = document.querySelectorAll('.thumbnail-card');
+        const selectAllBtn = document.getElementById('selectAll');
+        const deselectAllBtn = document.getElementById('deselectAll');
+        const selectedCountEl = document.getElementById('selectedCount');
+        const generateBtn = document.getElementById('generateBtn');
+        const setNameInput = document.getElementById('set_name');
+        const namePreview = document.getElementById('name_preview');
+        
+        // Update selected count
+        function updateSelectedCount() {
+            const selectedCount = document.querySelectorAll('.slide-checkbox:checked').length;
+            selectedCountEl.textContent = selectedCount;
+            
+            // Disable generate button if no slides selected
+            if (selectedCount === 0) {
+                generateBtn.disabled = true;
+                generateBtn.innerHTML = '<i class="fas fa-exclamation-circle me-1"></i> Select at least one slide';
+            } else {
+                generateBtn.disabled = false;
+                generateBtn.innerHTML = '<i class="fas fa-qrcode me-1"></i> Generate QR Code';
+            }
+        }
+        
+        // Make entire card clickable
+        thumbnailCards.forEach(card => {
+            card.addEventListener('click', function(e) {
+                // Don't toggle if clicking directly on the checkbox (let the checkbox handle that)
+                if (e.target.type !== 'checkbox') {
+                    const thumbnailId = this.dataset.thumbnailId;
+                    const checkbox = document.getElementById('thumb-' + thumbnailId);
+                    checkbox.checked = !checkbox.checked;
+                    
+                    // Update visual state
+                    if (checkbox.checked) {
+                        this.classList.add('border-primary', 'border-2');
+                    } else {
+                        this.classList.remove('border-primary', 'border-2');
+                    }
+                    
+                    updateSelectedCount();
+                }
+            });
+        });
+        
+        // Add event listeners to checkboxes
+        checkboxes.forEach(checkbox => {
+            checkbox.addEventListener('change', function() {
+                const card = this.closest('.thumbnail-card');
+                if (this.checked) {
+                    card.classList.add('border-primary', 'border-2');
+                } else {
+                    card.classList.remove('border-primary', 'border-2');
+                }
+                updateSelectedCount();
+            });
+        });
+        
+        // Select all button
+        selectAllBtn.addEventListener('click', function() {
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = true;
+                const card = checkbox.closest('.thumbnail-card');
+                card.classList.add('border-primary', 'border-2');
+            });
+            updateSelectedCount();
+        });
+        
+        // Deselect all button
+        deselectAllBtn.addEventListener('click', function() {
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
+                const card = checkbox.closest('.thumbnail-card');
+                card.classList.remove('border-primary', 'border-2');
+            });
+            updateSelectedCount();
+        });
+        
+        // Set name validation and preview
+        setNameInput.addEventListener('input', function() {
+            // Replace spaces with underscores in real-time
+            const sanitizedValue = this.value.replace(/\s+/g, '_').replace(/[^A-Za-z0-9_-]/g, '');
+            
+            // Only update if the value would change (prevents cursor jumping)
+            if (this.value !== sanitizedValue) {
+                this.value = sanitizedValue;
+            }
+            
+            // Update preview
+            namePreview.textContent = sanitizedValue || 'your_set_name';
+        });
+        
+        // Form submission - show loading overlay and connect to WebSocket
+        document.querySelector('form').addEventListener('submit', function(e) {
+            // Show the loading overlay
+            document.getElementById('loadingOverlay').classList.remove('d-none');
+            
+            // Don't connect to WebSocket if form is invalid
+            if (!this.checkValidity()) {
+                return;
+            }
+            
+            // Get the PDF ID from the URL
+            const pdfId = window.location.pathname.split('/').pop();
+            
+            // Connect to WebSocket for progress updates
+            const ws = new WebSocket(`ws://${window.location.host}/ws/progress/${pdfId}`);
+            
+            ws.onopen = function() {
+                console.log('WebSocket connection established');
+            };
+            
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                console.log('Progress update:', data);
+                
+                // Update the progress bar and text
+                const progressBar = document.getElementById('progressBar');
+                const progressText = document.getElementById('progressText');
+                const loadingMessage = document.getElementById('loadingMessage');
+                
+                // Update based on status
+                switch(data.status) {
+                    case 'initializing':
+                        loadingMessage.textContent = 'Initializing...';
+                        break;
+                    case 'processing':
+                        const percent = data.total > 0 ? (data.current / data.total) * 100 : 0;
+                        progressBar.style.width = `${percent}%`;
+                        progressText.textContent = `${data.current} of ${data.total} slides processed`;
+                        loadingMessage.textContent = 'Processing slides...';
+                        break;
+                    case 'uploading':
+                        progressBar.style.width = '80%';
+                        loadingMessage.textContent = 'Uploading files...';
+                        break;
+                    case 'generating_qr':
+                        progressBar.style.width = '90%';
+                        loadingMessage.textContent = 'Generating QR code...';
+                        break;
+                    case 'saving':
+                        progressBar.style.width = '95%';
+                        loadingMessage.textContent = 'Saving your set...';
+                        break;
+                    case 'complete':
+                        progressBar.style.width = '100%';
+                        loadingMessage.textContent = 'Complete! Redirecting...';
+                        break;
+                    case 'error':
+                        loadingMessage.textContent = 'Error occurred. Please try again.';
+                        document.getElementById('loadingOverlay').classList.add('bg-danger', 'bg-opacity-75');
+                        break;
+                }
+            };
+            
+            ws.onclose = function() {
+                console.log('WebSocket connection closed');
+            };
+            
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+                // If WebSocket fails, we still want the form to submit
+                document.getElementById('loadingMessage').textContent = 'Processing your request...';
+            };
+        });
+        
+        // Initial count update
+        updateSelectedCount();
+        
+        // Initial name preview
+        namePreview.textContent = 'your_set_name';
+    });
+</script>
+
+<style>
+    .thumbnail-card {
+        transition: transform 0.2s, box-shadow 0.2s;
+        cursor: pointer;
+        border: 2px solid transparent;
+    }
+    
+    .thumbnail-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    
+    .thumbnail-card.border-primary {
+        background-color: rgba(0, 102, 204, 0.05);
+    }
+    
+    .thumbnail-card .form-check {
+        cursor: pointer;
+    }
+    
+    .thumbnail-card img {
+        object-fit: cover;
+        height: 120px;
+    }
+    
+    #loadingOverlay {
+        transition: opacity 0.3s;
+    }
+</style>
+{% endblock %}
