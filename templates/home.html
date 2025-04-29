@@ -3,43 +3,304 @@
 {% block title %}Home | SlidePull{% endblock %}
 
 {% block content %}
-
-    <!-- Main Content -->
-    <div class="container mt-5">
-        <div class="row">
-            <div class="col-lg-6 col-md-8 mx-auto">
-                <div class="card shadow-sm">
-                    <div class="card-body">
-                        <h1 class="text-center mb-4">Welcome</h1>
-
-                        <!-- Login Form -->
-                        <form action="/login" method="post" class="mb-4">
+<div class="row align-items-center">
+    <!-- Hero Section -->
+    <div class="col-lg-6 mb-5 mb-lg-0">
+        <h1 class="display-4 fw-bold mb-3">Share Your Slides Instantly</h1>
+        <p class="lead mb-4">
+            SlidePull converts your PowerPoint presentations into shareable slides with QR codes. 
+            Perfect for teachers, presenters, and professionals who want to share content effortlessly.
+        </p>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="#" class="btn btn-primary btn-lg not-implemented" data-feature="learn-more">
+                <i class="fas fa-info-circle me-2"></i> Learn More
+            </a>
+            <a href="#" class="btn btn-outline-primary btn-lg not-implemented" data-feature="get-started">
+                <i class="fas fa-sign-in-alt me-2"></i> Get Started
+            </a>
+        </div>
+    </div>
+    
+    <!-- Login Section -->
+    <div class="col-lg-5 offset-lg-1">
+        <div class="card shadow-sm" id="login">
+            <div class="card-header bg-white">
+                <h2 class="h4 mb-0 section-title text-center">
+                    <i class="fas fa-user me-2"></i> Account Access
+                </h2>
+            </div>
+            <div class="card-body p-4">
+                <ul class="nav nav-tabs mb-4" id="authTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="login-tab" data-bs-toggle="tab" data-bs-target="#login-pane" type="button" role="tab" aria-controls="login-pane" aria-selected="true">Login</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="register-tab" data-bs-toggle="tab" data-bs-target="#register-pane" type="button" role="tab" aria-controls="register-pane" aria-selected="false">Register</button>
+                    </li>
+                </ul>
+                
+                <div class="tab-content" id="authTabsContent">
+                    <!-- Login Form -->
+                    <div class="tab-pane fade show active" id="login-pane" role="tabpanel" aria-labelledby="login-tab">
+                        <form action="/login" method="post" class="mb-3">
                             <div class="mb-3">
                                 <label for="email" class="form-label">Email:</label>
-                                <input type="email" name="email" id="email" class="form-control" placeholder="Enter your email" required>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                                    <input type="email" name="email" id="email" class="form-control" placeholder="Enter your email" required>
+                                </div>
                             </div>
                             <div class="mb-3">
                                 <label for="password" class="form-label">Password:</label>
-                                <input type="password" name="password" id="password" class="form-control" placeholder="Enter your password" required>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                                    <input type="password" name="password" id="password" class="form-control" placeholder="Enter your password" required>
+                                </div>
+                                <div class="form-text text-end">
+                                    <a href="/forgot-password" class="text-decoration-none">Forgot password?</a>
+                                </div>
                             </div>
                             <div class="d-grid">
-                                <button type="submit" class="btn btn-success">Login</button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-sign-in-alt me-2"></i> Login
+                                </button>
                             </div>
                         </form>
-
-                        <p class="text-center">Or login with:</p>
+                        
+                        <div class="text-center mb-3">
+                            <span class="text-muted">Or login with</span>
+                        </div>
+                        
                         <!-- Social Login Buttons -->
                         <div class="d-grid gap-2">
-                            <a href="/login/google" class="btn btn-outline-danger">Login with Google</a>
-                            <a href="/login/microsoft" class="btn btn-outline-primary">Login with Microsoft</a>
+                            <a href="#" class="btn btn-outline-danger social-login" data-provider="google">
+                                <i class="fab fa-google me-2"></i> Google
+                            </a>
+                            <a href="#" class="btn btn-outline-primary social-login" data-provider="linkedin">
+                                <i class="fab fa-linkedin me-2"></i> LinkedIn
+                            </a>
                         </div>
+                    </div>
+                    
+                    <!-- Registration Form -->
+                    <div class="tab-pane fade" id="register-pane" role="tabpanel" aria-labelledby="register-tab">
+                        <form action="/register" method="post">
+                            <div class="mb-3">
+                                <label for="reg-email" class="form-label">Email:</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                                    <input type="email" name="email" id="reg-email" class="form-control" placeholder="Enter your email" required>
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="reg-password" class="form-label">Password:</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                                    <input type="password" name="password" id="reg-password" class="form-control" placeholder="Create a password" required>
+                                </div>
+                                <div class="form-text">
+                                    Password must be at least 8 characters long.
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="confirm-password" class="form-label">Confirm Password:</label>
+                                <div class="input-group">
+                                    <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                                    <input type="password" name="confirm_password" id="confirm-password" class="form-control" placeholder="Confirm your password" required>
+                                </div>
+                            </div>
+                            <div class="d-grid">
+                                <button type="button" class="btn btn-primary not-implemented" data-feature="create-account">
+                                    <i class="fas fa-user-plus me-2"></i> Create Account
+                                </button>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+</div>
 
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<!-- Features Section -->
+<div class="row mt-5 pt-5" id="features">
+    <div class="col-12 text-center mb-4">
+        <h2 class="section-title display-6">Why Choose SlidePull?</h2>
+        <p class="lead">Simple, fast, and effective slide sharing</p>
+    </div>
+    
+    <div class="col-md-4 mb-4">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body text-center p-4">
+                <div class="feature-icon bg-primary bg-opacity-10 text-primary p-3 rounded-circle mb-3 mx-auto" style="width: 65px; height: 65px;">
+                    <i class="fas fa-bolt fa-2x"></i>
+                </div>
+                <h3 class="h4 mb-3">Quick Conversion</h3>
+                <p class="text-muted mb-0">
+                    Upload your PowerPoint and get it converted to shareable slides in seconds.
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4 mb-4">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body text-center p-4">
+                <div class="feature-icon bg-primary bg-opacity-10 text-primary p-3 rounded-circle mb-3 mx-auto" style="width: 65px; height: 65px;">
+                    <i class="fas fa-qrcode fa-2x"></i>
+                </div>
+                <h3 class="h4 mb-3">QR Code Sharing</h3>
+                <p class="text-muted mb-0">
+                    Generate QR codes that give instant access to your slides without any downloads.
+                </p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4 mb-4">
+        <div class="card h-100 border-0 shadow-sm">
+            <div class="card-body text-center p-4">
+                <div class="feature-icon bg-primary bg-opacity-10 text-primary p-3 rounded-circle mb-3 mx-auto" style="width: 65px; height: 65px;">
+                    <i class="fas fa-lock fa-2x"></i>
+                </div>
+                <h3 class="h4 mb-3">Secure Storage</h3>
+                <p class="text-muted mb-0">
+                    Your presentations are securely stored in the cloud with controlled access.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
 
-    {% endblock %}
+<!-- How It Works Section -->
+<div class="row mt-5 pt-3 bg-light-gray rounded-3 p-4">
+    <div class="col-12 text-center mb-4">
+        <h2 class="section-title display-6">How It Works</h2>
+        <p class="lead">Three simple steps to share your slides</p>
+    </div>
+    
+    <div class="col-md-4 mb-4 mb-md-0">
+        <div class="card h-100 border-0">
+            <div class="card-body text-center">
+                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 50px; height: 50px;">1</div>
+                <h3 class="h5">Upload</h3>
+                <p class="text-muted">Upload your PowerPoint presentation to our secure platform.</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4 mb-4 mb-md-0">
+        <div class="card h-100 border-0">
+            <div class="card-body text-center">
+                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 50px; height: 50px;">2</div>
+                <h3 class="h5">Select</h3>
+                <p class="text-muted">Choose which slides you want to include in your shareable set.</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card h-100 border-0">
+            <div class="card-body text-center">
+                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center mx-auto mb-3" style="width: 50px; height: 50px;">3</div>
+                <h3 class="h5">Share</h3>
+                <p class="text-muted">Get a QR code that gives instant access to your selected slides.</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .feature-icon {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    
+    #features {
+        scroll-margin-top: 80px;
+    }
+    
+    #login {
+        scroll-margin-top: 80px;
+    }
+</style>
+
+<!-- Modal for "Not Implemented" message -->
+<div class="modal fade" id="notImplementedModal" tabindex="-1" aria-labelledby="notImplementedModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="notImplementedModalLabel">Feature Not Available</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>This feature is not yet implemented.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-primary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript for not implemented features -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Get all social login buttons and other not implemented features
+        const socialLoginButtons = document.querySelectorAll('.social-login');
+        const notImplementedButtons = document.querySelectorAll('.not-implemented');
+        
+        // Function to show the modal
+        function showNotImplementedModal(e) {
+            e.preventDefault();
+            const modal = new bootstrap.Modal(document.getElementById('notImplementedModal'));
+            modal.show();
+        }
+        
+        // Add click event listener to social login buttons
+        socialLoginButtons.forEach(button => {
+            button.addEventListener('click', showNotImplementedModal);
+        });
+        
+        // Add click event listener to other not implemented buttons
+        notImplementedButtons.forEach(button => {
+            button.addEventListener('click', showNotImplementedModal);
+        });
+        
+        // Special handling for the "Get Started" button to scroll to login section after showing modal
+        const getStartedButton = document.querySelector('[data-feature="get-started"]');
+        if (getStartedButton) {
+            getStartedButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // Show the modal
+                const modal = new bootstrap.Modal(document.getElementById('notImplementedModal'));
+                modal.show();
+                
+                // After modal is hidden, scroll to login section
+                document.getElementById('notImplementedModal').addEventListener('hidden.bs.modal', function () {
+                    document.getElementById('login').scrollIntoView({ behavior: 'smooth' });
+                }, { once: true });
+            });
+        }
+        
+        // Special handling for the "Learn More" button to scroll to features section after showing modal
+        const learnMoreButton = document.querySelector('[data-feature="learn-more"]');
+        if (learnMoreButton) {
+            learnMoreButton.addEventListener('click', function(e) {
+                e.preventDefault();
+                
+                // Show the modal
+                const modal = new bootstrap.Modal(document.getElementById('notImplementedModal'));
+                modal.show();
+                
+                // After modal is hidden, scroll to features section
+                document.getElementById('notImplementedModal').addEventListener('hidden.bs.modal', function () {
+                    document.getElementById('features').scrollIntoView({ behavior: 'smooth' });
+                }, { once: true });
+            });
+        }
+    });
+</script>
+{% endblock %}

@@ -1,13 +1,114 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Upload PPTX</title>
-</head>
-<body>
-    
-    <a href="/">Home</a>
+{% extends "base.html" %}
 
-</body>
-</html>
+{% block title %}QR Code | SlidePull{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-lg-12">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="/dashboard">Dashboard</a></li>
+                <li class="breadcrumb-item active" aria-current="page">QR Code</li>
+            </ol>
+        </nav>
+        
+        <div class="card">
+            <div class="card-header bg-white">
+                <h1 class="h3 mb-0 section-title">
+                    <i class="fas fa-qrcode me-2"></i> Your QR Code
+                </h1>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-4 mb-md-0">
+                        <div class="card h-100 bg-light-gray">
+                            <div class="card-body text-center">
+                                {% if qr_code_url %}
+                                    <img src="{{ qr_code_url }}?{{ qr_code_sas_token }}" 
+                                         alt="QR Code" 
+                                         class="img-fluid p-3 mb-3" 
+                                         style="max-width: 300px;">
+                                    
+                                    <div class="d-grid gap-2">
+                                        <a href="{{ qr_code_url }}?{{ qr_code_sas_token }}" 
+                                           class="btn btn-primary" 
+                                           download="{{ set_name }}_qrcode.png">
+                                            <i class="fas fa-download me-2"></i> Download QR Code
+                                        </a>
+                                        <button type="button" 
+                                                class="btn btn-outline-secondary" 
+                                                onclick="window.print()">
+                                            <i class="fas fa-print me-2"></i> Print QR Code
+                                        </button>
+                                    </div>
+                                {% else %}
+                                    <div class="alert alert-warning">
+                                        <i class="fas fa-exclamation-triangle me-2"></i>
+                                        QR code not found or has expired.
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h2 class="h4 mb-3">QR Code Information</h2>
+                                
+                                <dl class="row">
+                                    <dt class="col-sm-4">Set Name:</dt>
+                                    <dd class="col-sm-8">{{ set_name }}</dd>
+                                    
+                                    <dt class="col-sm-4">Created:</dt>
+                                    <dd class="col-sm-8">{{ created_at|default('Just now') }}</dd>
+                                    
+                                    <dt class="col-sm-4">Slides:</dt>
+                                    <dd class="col-sm-8">{{ slide_count|default('Multiple') }} slides</dd>
+                                    
+                                    <dt class="col-sm-4">Expires:</dt>
+                                    <dd class="col-sm-8">{{ expiry_date|default('7 days from now') }}</dd>
+                                </dl>
+                                
+                                <hr>
+                                
+                                <h3 class="h5 mb-3">How to use this QR Code</h3>
+                                <ol class="mb-0">
+                                    <li>Download or print the QR code</li>
+                                    <li>Include it in your presentation materials</li>
+                                    <li>Attendees can scan it with any QR code scanner</li>
+                                    <li>They'll instantly access your selected slides</li>
+                                </ol>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-center mt-4">
+                    <a href="/dashboard" class="btn btn-outline-primary">
+                        <i class="fas fa-arrow-left me-2"></i> Back to Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        .card-body img, .card-body img * {
+            visibility: visible;
+        }
+        .card-body img {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: auto;
+        }
+    }
+</style>
+{% endblock %}
