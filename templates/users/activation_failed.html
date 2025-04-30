@@ -1,14 +1,33 @@
-<!-- app/templates/activation_failed.html -->
+{% extends "base.html" %}
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Activation Failed</title>
-</head>
-<body>
-    <h1>Activation Failed</h1>
-    <p>{{ message }}</p>
-    <p>Please contact support or try registering again.</p>
-</body>
-</html>
+{% block title %}Activation Failed | SlidePull{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card">
+            <div class="card-header bg-danger text-white">
+                <h1 class="h4 mb-0">
+                    <i class="fas fa-exclamation-circle me-2"></i> Activation Failed
+                </h1>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-danger">
+                    <p>{{ message }}</p>
+                </div>
+                <p>Please try one of the following options:</p>
+                <ul>
+                    <li>Check if you clicked the correct link from your email</li>
+                    <li>Try registering again with the same email address</li>
+                    <li>Contact support if the problem persists</li>
+                </ul>
+                <div class="mt-4">
+                    <a href="/" class="btn btn-primary">
+                        <i class="fas fa-home me-2"></i> Return to Home
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

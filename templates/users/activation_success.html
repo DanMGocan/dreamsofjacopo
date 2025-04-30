@@ -1,13 +1,31 @@
-<!-- app/templates/activation_success.html -->
+{% extends "base.html" %}
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Account Activated</title>
-</head>
-<body>
-    <h1>Account Activated</h1>
-    <p>Your account has been successfully activated. You can now <a href="/login">login</a>.</p>
-</body>
-</html>
+{% block title %}Account Activated | SlidePull{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h1 class="h4 mb-0">
+                    <i class="fas fa-check-circle me-2"></i> Account Activated
+                </h1>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-success">
+                    <p>Your account has been successfully activated!</p>
+                </div>
+                <p>You can now access all features of SlidePull. Start by uploading your first presentation.</p>
+                <div class="mt-4 d-flex gap-2">
+                    <a href="/dashboard" class="btn btn-primary">
+                        <i class="fas fa-tachometer-alt me-2"></i> Go to Dashboard
+                    </a>
+                    <a href="/login" class="btn btn-outline-primary">
+                        <i class="fas fa-sign-in-alt me-2"></i> Login
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

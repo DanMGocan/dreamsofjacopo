@@ -5,7 +5,7 @@
 {% block content %}
 <div class="row align-items-center">
     <!-- Hero Section -->
-    <div class="col-lg-6 mb-5 mb-lg-0">
+    <div class="col-lg-6 mb-5 mb-lg-0" id="hero-section-text">
         <h1 class="display-4 fw-bold mb-3">Share Your Slides Instantly</h1>
         <p class="lead mb-4">
             SlidePull converts your PowerPoint presentations into shareable slides with QR codes. 
@@ -60,31 +60,23 @@
                                     <a href="/forgot-password" class="text-decoration-none">Forgot password?</a>
                                 </div>
                             </div>
-                            <div class="d-grid">
+                            <div class="d-grid gap-2">
                                 <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-sign-in-alt me-2"></i> Login
                                 </button>
+                                <a href="#" class="btn btn-primary social-login" data-provider="google">
+                                    <i class="fab fa-google me-2"></i> Google
+                                </a>
+                                <a href="#" class="btn btn-primary social-login" data-provider="linkedin">
+                                    <i class="fab fa-linkedin me-2"></i> LinkedIn
+                                </a>
                             </div>
                         </form>
-                        
-                        <div class="text-center mb-3">
-                            <span class="text-muted">Or login with</span>
-                        </div>
-                        
-                        <!-- Social Login Buttons -->
-                        <div class="d-grid gap-2">
-                            <a href="#" class="btn btn-outline-danger social-login" data-provider="google">
-                                <i class="fab fa-google me-2"></i> Google
-                            </a>
-                            <a href="#" class="btn btn-outline-primary social-login" data-provider="linkedin">
-                                <i class="fab fa-linkedin me-2"></i> LinkedIn
-                            </a>
-                        </div>
                     </div>
                     
                     <!-- Registration Form -->
                     <div class="tab-pane fade" id="register-pane" role="tabpanel" aria-labelledby="register-tab">
-                        <form action="/register" method="post">
+                        <form action="/create-account" method="post" id="registrationForm">
                             <div class="mb-3">
                                 <label for="reg-email" class="form-label">Email:</label>
                                 <div class="input-group">
@@ -109,8 +101,11 @@
                                     <input type="password" name="confirm_password" id="confirm-password" class="form-control" placeholder="Confirm your password" required>
                                 </div>
                             </div>
+                            <div class="mb-3">
+                                <div id="password-mismatch-error" class="text-danger" style="display: none;">Passwords do not match.</div>
+                            </div>
                             <div class="d-grid">
-                                <button type="button" class="btn btn-primary not-implemented" data-feature="create-account">
+                                <button type="submit" class="btn btn-primary">
                                     <i class="fas fa-user-plus me-2"></i> Create Account
                                 </button>
                             </div>
@@ -216,13 +211,18 @@
         align-items: center;
         justify-content: center;
     }
-    
+
     #features {
         scroll-margin-top: 80px;
     }
     
     #login {
         scroll-margin-top: 80px;
+    }
+    
+    /* Ensure consistent tab pane height */
+    .tab-pane {
+        min-height: 320px;
     }
 </style>
 
@@ -267,6 +267,39 @@
         notImplementedButtons.forEach(button => {
             button.addEventListener('click', showNotImplementedModal);
         });
+
+        // Add password confirmation validation
+        const registrationForm = document.getElementById('registrationForm');
+        const passwordInput = document.getElementById('reg-password');
+        const confirmPasswordInput = document.getElementById('confirm-password');
+        const passwordMismatchError = document.getElementById('password-mismatch-error');
+
+        if (registrationForm && passwordInput && confirmPasswordInput && passwordMismatchError) {
+            registrationForm.addEventListener('submit', function(event) {
+                if (passwordInput.value !== confirmPasswordInput.value) {
+                    event.preventDefault(); // Prevent form submission
+                    passwordMismatchError.style.display = 'block'; // Show error message
+                    confirmPasswordInput.classList.add('is-invalid'); // Add red border
+                } else {
+                    passwordMismatchError.style.display = 'none'; // Hide error message
+                    confirmPasswordInput.classList.remove('is-invalid'); // Remove red border
+                }
+            });
+
+            // Optional: Hide error message when user starts typing again
+            confirmPasswordInput.addEventListener('input', function() {
+                if (passwordMismatchError.style.display === 'block') {
+                    passwordMismatchError.style.display = 'none';
+                    confirmPasswordInput.classList.remove('is-invalid');
+                }
+            });
+             passwordInput.addEventListener('input', function() {
+                if (passwordMismatchError.style.display === 'block') {
+                    passwordMismatchError.style.display = 'none';
+                    confirmPasswordInput.classList.remove('is-invalid');
+                }
+            });
+        }
         
         // Special handling for the "Get Started" button to scroll to login section after showing modal
         const getStartedButton = document.querySelector('[data-feature="get-started"]');

@@ -131,8 +131,8 @@ def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db):
 
         # Process each page of the PDF
         for page_number in range(total_pages):
-            # Update progress
-            conversion_progress[str_pdf_id]["current"] = page_number
+            # Update progress (using 1-based indexing for better user display)
+            conversion_progress[str_pdf_id]["current"] = page_number + 1
             
             # Load the page and render it at high quality
             page = pdf_document.load_page(page_number)

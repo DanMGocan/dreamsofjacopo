@@ -115,16 +115,42 @@
 </div>
 
 <!-- Loading Overlay -->
-<div id="loadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-75 d-none" style="z-index: 9999;">
-    <div class="position-absolute top-50 start-50 translate-middle text-center text-white">
-        <div class="spinner-border mb-3" role="status">
-            <span class="visually-hidden">Loading...</span>
+<div id="loadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-none" style="z-index: 9999; background-color: rgba(0, 48, 143, 0.8);">
+    <div class="position-absolute top-50 start-50 translate-middle text-center" style="width: 90%; max-width: 500px;">
+        <div class="card border-0 shadow-lg">
+            <div class="card-header" style="background-color: #e3f2fd;">
+                <i class="fas fa-cog fa-spin me-2" style="color: #00308F;"></i>
+                <h5 class="mb-0" id="loadingMessage" style="color: #00308F;">Creating your slide set...</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-center mb-4">
+                    <div class="spinner-border" style="width: 3rem; height: 3rem; color: #00308F;" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+                
+                <div class="set-info mb-4">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span style="color: #495057;">Set Name:</span>
+                        <span class="fw-medium" id="setNameDisplay" style="color: #333333;">your_set</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span style="color: #495057;">Slides Selected:</span>
+                        <span class="fw-medium" id="slidesCountDisplay" style="color: #333333;">0</span>
+                    </div>
+                </div>
+                
+                <div class="progress mb-3" style="height: 10px; background-color: #f8f9fa;">
+                    <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%; background-color: #00308F;"></div>
+                </div>
+                
+                <p id="progressText" class="mb-0 text-center" style="color: #495057;">Please wait while we process your slides</p>
+                
+                <div id="warningContainer" class="mt-3">
+                    <!-- Warning will be inserted here if needed -->
+                </div>
+            </div>
         </div>
-        <h4 id="loadingMessage">Processing slides...</h4>
-        <div class="progress mt-3" style="width: 300px; height: 25px;">
-            <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
-        </div>
-        <p id="progressText" class="mt-2">0 of 0 slides processed</p>
     </div>
 </div>
 
@@ -236,65 +262,38 @@
             // Get the PDF ID from the URL
             const pdfId = window.location.pathname.split('/').pop();
             
-            // Connect to WebSocket for progress updates
-            const ws = new WebSocket(`ws://${window.location.host}/ws/progress/${pdfId}`);
+            // Get information about the selected slides
+            const selectedSlides = document.querySelectorAll('.slide-checkbox:checked').length;
+            const setName = document.getElementById('set_name').value;
             
-            ws.onopen = function() {
-                console.log('WebSocket connection established');
-            };
+            // Show file information and loading animation
+            const progressBar = document.getElementById('progressBar');
+            const progressText = document.getElementById('progressText');
+            const loadingMessage = document.getElementById('loadingMessage');
             
-            ws.onmessage = function(event) {
-                const data = JSON.parse(event.data);
-                console.log('Progress update:', data);
-                
-                // Update the progress bar and text
-                const progressBar = document.getElementById('progressBar');
-                const progressText = document.getElementById('progressText');
-                const loadingMessage = document.getElementById('loadingMessage');
-                
-                // Update based on status
-                switch(data.status) {
-                    case 'initializing':
-                        loadingMessage.textContent = 'Initializing...';
-                        break;
-                    case 'processing':
-                        const percent = data.total > 0 ? (data.current / data.total) * 100 : 0;
-                        progressBar.style.width = `${percent}%`;
-                        progressText.textContent = `${data.current} of ${data.total} slides processed`;
-                        loadingMessage.textContent = 'Processing slides...';
-                        break;
-                    case 'uploading':
-                        progressBar.style.width = '80%';
-                        loadingMessage.textContent = 'Uploading files...';
-                        break;
-                    case 'generating_qr':
-                        progressBar.style.width = '90%';
-                        loadingMessage.textContent = 'Generating QR code...';
-                        break;
-                    case 'saving':
-                        progressBar.style.width = '95%';
-                        loadingMessage.textContent = 'Saving your set...';
-                        break;
-                    case 'complete':
-                        progressBar.style.width = '100%';
-                        loadingMessage.textContent = 'Complete! Redirecting...';
-                        break;
-                    case 'error':
-                        loadingMessage.textContent = 'Error occurred. Please try again.';
-                        document.getElementById('loadingOverlay').classList.add('bg-danger', 'bg-opacity-75');
-                        break;
+            // Display set name and slide count
+            document.getElementById('setNameDisplay').textContent = setName;
+            document.getElementById('slidesCountDisplay').textContent = selectedSlides;
+            loadingMessage.textContent = `Creating set: ${setName}`;
+            progressText.textContent = `Processing ${selectedSlides} slides`;
+            
+            // Add warning for large sets
+            if (selectedSlides > 20) {
+                const warningElement = document.createElement('div');
+                warningElement.className = 'alert alert-warning';
+                warningElement.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i> Please note, due to the size of the set, processing might take a bit longer than expected. But trust us, it\'s working.';
+                document.getElementById('warningContainer').appendChild(warningElement);
+            }
+            
+            // Animate the progress bar - slower but steady animation
+            let progress = 0;
+            const interval = setInterval(() => {
+                // Slowly increase progress up to 95%
+                if (progress < 95) {
+                    progress += 0.5;
+                    progressBar.style.width = `${progress}%`;
                 }
-            };
-            
-            ws.onclose = function() {
-                console.log('WebSocket connection closed');
-            };
-            
-            ws.onerror = function(error) {
-                console.error('WebSocket error:', error);
-                // If WebSocket fails, we still want the form to submit
-                document.getElementById('loadingMessage').textContent = 'Processing your request...';
-            };
+            }, 500);
         });
         
         // Initial count update

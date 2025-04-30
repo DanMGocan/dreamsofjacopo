@@ -154,8 +154,11 @@ async def upload_pptx(
         
         # Update the upload_id in the conversion_progress dictionary to match the pdf_id
         # This allows the WebSocket to track progress using the pdf_id
+        print(f"Updating progress tracking: upload_id={upload_id} -> pdf_id={pdf_id}")
+        print(f"Current progress data: {conversion_progress[upload_id]}")
         conversion_progress[str(pdf_id)] = conversion_progress[upload_id]
         del conversion_progress[upload_id]
+        print(f"Progress data now tracked under pdf_id={pdf_id}: {conversion_progress[str(pdf_id)]}")
 
         # Step 2: Convert the PDF to images and thumbnails
         # This function will update the progress in the conversion_progress dictionary
@@ -302,8 +305,6 @@ async def delete_presentation(
         # Always close the database cursor
         cursor.close()
 
-
-
 @converter.get("/select-slides/{pdf_id}", response_class=HTMLResponse)
 async def select_thumbnails(
     pdf_id: int,
@@ -335,40 +336,7 @@ async def select_thumbnails(
 
 import logging
 
-# WebSocket endpoint for progress updates
-@converter.websocket("/ws/progress/{pdf_id}")
-async def websocket_progress(websocket: WebSocket, pdf_id: str):
-    await websocket.accept()
-    
-    # Initialize progress for this PDF if not exists
-    if pdf_id not in conversion_progress:
-        conversion_progress[pdf_id] = {
-            "total": 0,
-            "current": 0,
-            "status": "waiting"
-        }
-    
-    try:
-        # Keep connection open and send updates
-        while True:
-            if pdf_id in conversion_progress:
-                progress = conversion_progress[pdf_id]
-                await websocket.send_json(progress)
-                
-                # If process is complete, close the connection
-                if progress["status"] == "complete":
-                    await websocket.close()
-                    break
-            
-            # Check for updates every second
-            await asyncio.sleep(1)
-    except Exception as e:
-        logging.error(f"WebSocket error: {e}")
-    finally:
-        # Clean up progress data after some time
-        if pdf_id in conversion_progress and conversion_progress[pdf_id]["status"] == "complete":
-            # In a real app, you might want to schedule this for deletion after a timeout
-            pass
+# Progress tracking is now handled client-side with a simple animation
 
 @converter.post("/generate-set/{pdf_id}", response_class=HTMLResponse)
 def generate_set(
@@ -482,7 +450,7 @@ def generate_set(
                     filename = f"slide_{idx+1}_{os.path.basename(image['url'])}"
                     zip_file.writestr(filename, blob_data)
                     
-                    # Update progress
+                    # Update progress (using 1-based indexing for better user display)
                     conversion_progress[str_pdf_id]["current"] = idx + 1
                     
                 except Exception as e:

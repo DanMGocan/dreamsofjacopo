@@ -8,52 +8,92 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <!-- Font Awesome for icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
     <!-- Custom CSS -->
     <style>
         :root {
-            --primary-color: #0066cc;
-            --secondary-color: #f5f5f5;
-            --text-color: #333333;
-            --light-gray: #e9ecef;
-            --dark-gray: #495057;
+            /* White and Navy Blue Theme */
+            --primary-color: #00308F;       /* Navy Blue */
+            --secondary-color: #FFFFFF;    /* White */
+            --accent-color: #ADD8E6;        /* Light Blue (Accent) */
+            --text-color: #333333;          /* Dark Gray */
+            --light-gray: #f8f9fa;          /* Very Light Gray */
+            --dark-gray: #495057;           /* Dark Gray */
         }
         
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Poppins', sans-serif;
             color: var(--text-color);
-            background-color: #ffffff;
+            background-color: var(--light-gray);
+            line-height: 1.6;
         }
         
+        /* Navbar styling */
         .navbar {
             background-color: var(--primary-color) !important;
             box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
         
         .navbar-brand {
-            font-weight: 600;
-            font-size: 1.5rem;
+            font-weight: 700;
+            font-size: 1.75rem;
+            color: var(--secondary-color) !important;
         }
         
+        .navbar-dark .navbar-nav .nav-link {
+            color: var(--secondary-color);
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            transition: all 0.3s ease;
+        }
+        
+        .navbar-dark .navbar-nav .nav-link:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+        
+        /* Card styling */
         .card {
-            border-radius: 8px;
+            background-color: var(--secondary-color);
+            border: none;
+            border-radius: 10px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
-            transition: transform 0.2s, box-shadow 0.2s;
             margin-bottom: 1.5rem;
         }
         
-        .card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+        .card-header {
+            background-color: #FFFFFF;
+            border-bottom: 1px solid #e9ecef;
+            padding: 1rem 1.25rem;
+            font-weight: 600;
+            color: var(--primary-color);
+        }
+        
+        .card-body {
+            padding: 1.5rem;
+        }
+        
+        /* Button styling */
+        .btn {
+            font-weight: 500;
+            border-radius: 0.375rem;
+            padding: 0.625rem 1.5rem;
+            transition: all 0.3s ease;
         }
         
         .btn-primary {
             background-color: var(--primary-color);
             border-color: var(--primary-color);
+            color: var(--secondary-color);
         }
         
         .btn-primary:hover {
-            background-color: #0055aa;
-            border-color: #0055aa;
+            background-color: #002277;
+            border-color: #002277;
         }
         
         .btn-outline-primary {
@@ -63,23 +103,61 @@
         
         .btn-outline-primary:hover {
             background-color: var(--primary-color);
-            color: white;
+            color: var(--secondary-color);
         }
         
+        .btn-danger {
+            background-color: var(--accent-color);
+            border-color: var(--accent-color);
+            color: var(--text-color);
+        }
+        
+        .btn-danger:hover {
+            background-color: #c0392b;
+            border-color: #c0392b;
+        }
+        
+        /* Form controls */
+        .form-control {
+            border: 1px solid #ced4da;
+            border-radius: 0.375rem;
+            padding: 0.625rem 1rem;
+            color: var(--text-color);
+        }
+        
+        .form-control:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(0, 48, 143, 0.25);
+        }
+        
+        .form-label {
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            color: var(--text-color);
+        }
+        
+        .form-text {
+            color: #6c757d;
+        }
+        
+        /* Section titles */
         .section-title {
-            border-bottom: 2px solid var(--light-gray);
-            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 0.75rem;
             margin-bottom: 1.5rem;
             color: var(--primary-color);
+            font-weight: 600;
         }
         
+        /* Background utilities */
         .bg-light-gray {
-            background-color: var(--secondary-color);
+            background-color: #f8f9fa;
         }
         
+        /* Footer styling */
         footer {
-            background-color: var(--dark-gray);
-            color: white;
+            background-color: var(--primary-color);
+            color: var(--secondary-color);
             padding: 1.5rem 0;
             margin-top: 3rem;
         }
@@ -91,8 +169,10 @@
         
         /* Custom alert styling */
         .alert {
-            border-radius: 8px;
+            border: none;
             border-left: 4px solid;
+            border-radius: 0.375rem;
+            padding: 1rem 1.25rem;
         }
         
         .alert-success {
@@ -106,13 +186,89 @@
         .alert-info {
             border-left-color: var(--primary-color);
         }
+        
+        .alert-warning {
+            border-left-color: var(--warning-color);
+        }
+        
+        /* Table styling */
+        .table {
+            color: var(--text-color);
+            border-color: #e9ecef;
+        }
+        
+        .table-light, .table-light>td, .table-light>th {
+            background-color: #f8f9fa;
+        }
+        
+        /* Badge styling */
+        .badge {
+            font-weight: 500;
+            padding: 0.5em 0.75em;
+            border-radius: 0.25rem;
+        }
+        
+        /* Progress bar */
+        .progress {
+            background-color: #e9ecef;
+            border-radius: 0.5rem;
+            height: 0.75rem;
+            overflow: hidden;
+        }
+        
+        .progress-bar {
+            background-color: var(--primary-color);
+        }
+        
+        /* Loading overlay */
+        .loading-overlay {
+            background-color: rgba(255, 255, 255, 0.8);
+        }
+        
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+        
+        ::-webkit-scrollbar-thumb:hover {
+            background: #999;
+        }
+
+        #hero-section-text {
+            position: relative;
+            padding-top: 100px; /* Increased padding to move text higher */
+            /* Background image moved to pseudo-element for opacity control */
+        }
+
+        #hero-section-text::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: url('/static/media/img/presentation.png');
+            background-size: cover;
+            background-position: bottom; /* Position image at the bottom */
+            opacity: 0.15; /* Set transparency to 95% */
+            z-index: -1; /* Place the pseudo-element behind the content */
+        }
     </style>
     <!-- Optional additional CSS -->
     <link href="/static/css/styles.css" rel="stylesheet">
 </head>
 <body class="d-flex flex-column min-vh-100">
     <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark">
+    <nav class="navbar navbar-expand-lg navbar-dark sticky-top">
         <div class="container">
             <a class="navbar-brand" href="/">
                 <i class="fas fa-file-powerpoint me-2"></i>SlidePull
@@ -123,8 +279,8 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav ms-auto">
                     <li class="nav-item">
-                        <a class="nav-link" href="/">
-                            <i class="fas fa-home me-1"></i> Home
+                        <a class="nav-link" href="/how-it-works">
+                            <i class="fas fa-question-circle me-1"></i> How it works?
                         </a>
                     </li>
                     {% if 'email' in request.session %}
@@ -139,6 +295,14 @@
                         </a>
                     </li>
                     {% else %}
+                    <!-- Only show Home button when not on the home page -->
+                    {% if request.path != '/' %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="/">
+                            <i class="fas fa-home me-1"></i> Home
+                        </a>
+                    </li>
+                    {% endif %}
                     <li class="nav-item">
                         <a class="nav-link" href="/login">
                             <i class="fas fa-sign-in-alt me-1"></i> Login

@@ -4,16 +4,42 @@
 
 {% block content %}
 <!-- Loading Overlay for Upload Process -->
-<div id="uploadLoadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 bg-dark bg-opacity-75 d-none" style="z-index: 9999;">
-    <div class="position-absolute top-50 start-50 translate-middle text-center text-white">
-        <div class="spinner-border mb-3" role="status">
-            <span class="visually-hidden">Loading...</span>
+<div id="uploadLoadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-none" style="z-index: 9999; background-color: rgba(0, 48, 143, 0.8);">
+    <div class="position-absolute top-50 start-50 translate-middle text-center" style="width: 90%; max-width: 500px;">
+        <div class="card border-0 shadow-lg">
+            <div class="card-header" style="background-color: #e3f2fd;">
+                <i class="fas fa-cog fa-spin me-2" style="color: #00308F;"></i>
+                <h5 class="mb-0" id="uploadLoadingMessage" style="color: #00308F;">Processing your presentation...</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-flex justify-content-center mb-4">
+                    <div class="spinner-border" style="width: 3rem; height: 3rem; color: #00308F;" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+                
+                <div class="file-info mb-4">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span style="color: #495057;">File:</span>
+                        <span class="fw-medium" id="fileNameDisplay" style="color: #333333;">presentation.pptx</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span style="color: #495057;">Size:</span>
+                        <span class="fw-medium" id="fileSizeDisplay" style="color: #333333;">0 KB</span>
+                    </div>
+                </div>
+                
+                <div class="progress mb-3" style="height: 10px; background-color: #f8f9fa;">
+                    <div id="uploadProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%; background-color: #00308F;"></div>
+                </div>
+                
+                <p id="uploadProgressText" class="mb-0 text-center" style="color: #495057;">Please wait while we process your slides</p>
+                
+                <div id="warningContainer" class="mt-3">
+                    <!-- Warning will be inserted here if needed -->
+                </div>
+            </div>
         </div>
-        <h4 id="uploadLoadingMessage">Processing your presentation...</h4>
-        <div class="progress mt-3" style="width: 300px; height: 25px;">
-            <div id="uploadProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
-        </div>
-        <p id="uploadProgressText" class="mt-2">Please wait while we process your slides</p>
     </div>
 </div>
 <!-- User Profile Section -->
@@ -56,60 +82,84 @@
 
 {% if not account_activated %}
     <div class="alert alert-danger" role="alert">
-        <i class="fas fa-exclamation-triangle me-2"></i> <strong>Account not activated</strong>
-        <p class="mb-0">Please check your email for the activation link or 
-            <form action="/resend-activation" method="POST" class="d-inline">
-                <button type="submit" class="btn btn-link p-0">resend the activation email</button>.
-            </form>
-        </p>
+        <i class="fas fa-exclamation-triangle me-2"></i> <strong>Account not activated</strong> Please check your email for the activation link or 
+        <form action="/resend-activation" method="POST" class="d-inline">
+            <button type="submit" class="btn btn-link p-0">resend the activation email</button>.
+        </form>
     </div>
 {% endif %}
 
 {% if premium_status == 0 %}
     <div class="alert alert-info" role="alert">
         <i class="fas fa-info-circle me-2"></i> <strong>Free account limitations</strong>
-        <p class="mb-0">As a free user, you can only upload one presentation. 
-            <a href="/upgrade" class="alert-link">Upgrade your account</a> to upload more presentations.
+        <p class="mb-0">As a free user, you can only upload one presentation slot. 
+            <a href="/upgrade" class="alert-link">Upgrade your account</a> to upload more presentation slots.
             {% if presentations and presentations|length >= 1 %}
-                You must delete the existing presentation before uploading a new one.
+                You must delete the existing presentation slot before uploading a new one.
             {% endif %}
         </p>
     </div>
 {% endif %}
 
-    <!-- Upload Section -->
-    <div class="card mb-4">
-        <div class="card-header bg-white">
-            <h2 class="section-title h4 mb-0">
-                <i class="fas fa-upload me-2"></i> Upload Presentation
-            </h2>
-        </div>
-        <div class="card-body">
-            {% if premium_status == 0 and presentations and presentations|length >= 1 %}
-                <div class="alert alert-warning">
-                    <i class="fas fa-exclamation-circle me-2"></i> You've reached your upload limit.
-                    Please delete an existing presentation before uploading a new one.
-                </div>
-            {% else %}
-                <form id="uploadForm" action="/upload-pptx" method="post" enctype="multipart/form-data">
-                    <div class="mb-3">
-                        <label for="pptx_file" class="form-label">Choose PowerPoint file:</label>
-                        <input type="file" id="pptx_file" name="pptx_file" class="form-control" accept=".pptx" required>
-                        <div class="form-text">Only .pptx files are supported. Maximum file size: 50MB.</div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-cloud-upload-alt me-1"></i> Upload
-                    </button>
-                </form>
-            {% endif %}
-        </div>
+<!-- Upload Section -->
+<div class="card mb-4">
+    <div class="card-header bg-white">
+        <h2 class="section-title h4 mb-0">
+            <i class="fas fa-upload me-2"></i> Upload Presentation Slot
+        </h2>
     </div>
+    <div class="card-body">
+        {% if premium_status == 0 and presentations and presentations|length >= 1 %}
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-circle me-2"></i> You've reached your upload limit.
+                Please delete an existing presentation slot before uploading a new one.
+            </div>
+        {% else %}
+                <form id="uploadForm" action="/upload-pptx" method="post" enctype="multipart/form-data">
+                    <div class="row align-items-center">
+                        <div class="col-12"> {# Changed from col-md-9 to col-12 #}
+                            <label for="pptx_file" class="form-label">Choose PowerPoint file:</label>
+                            <div class="d-flex align-items-stretch gap-2">
+                                <input type="file" id="pptx_file" name="pptx_file" class="form-control flex-grow-1" accept=".pptx" required style="height: auto;"> {# Added style="height: auto;" #}
+                                <button type="submit" class="btn btn-primary {% if not account_activated %}btn-secondary{% endif %}" 
+                                        {% if not account_activated %}disabled
+                                        data-bs-toggle="tooltip" 
+                                        data-bs-placement="top" 
+                                        title="Please check your email to activate your account"{% endif %}>
+                                    {% if not account_activated %}
+                                        Please check your email to activate your account
+                                    {% else %}
+                                        <i class="fas fa-cloud-upload-alt me-1"></i> Upload
+                                    {% endif %}
+                                </button>
+                            </div>
+                            <div class="form-text">Only .pptx files are supported. Maximum file size: 50MB.</div>
+                            {% if not account_activated %}
+                                <div class="form-text text-danger mt-2">
+                                    <i class="fas fa-exclamation-circle me-1"></i> Please activate your account to upload presentations.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </form>
+                <script>
+                    // Initialize tooltips
+                    document.addEventListener('DOMContentLoaded', function() {
+                        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+                        tooltipTriggerList.map(function (tooltipTriggerEl) {
+                            return new bootstrap.Tooltip(tooltipTriggerEl);
+                        });
+                    });
+                </script>
+        {% endif %}
+    </div>
+</div>
 
-<!-- Presentations List -->
+<!-- Presentation Slots List -->
 <div class="card">
     <div class="card-header bg-white">
         <h2 class="section-title h4 mb-0">
-            <i class="fas fa-file-powerpoint me-2"></i> Your Presentations
+            <i class="fas fa-file-powerpoint me-2"></i> Your Presentation Slots
         </h2>
     </div>
     <div class="card-body">
@@ -127,7 +177,7 @@
                                     <div>
                                         <form action="/delete-presentation/{{ presentation.pdf_id }}" method="POST" class="d-inline">
                                             <button type="submit" class="btn btn-outline-danger btn-sm" 
-                                                    onclick="return confirm('Are you sure you want to delete this presentation?')">
+                                                    onclick="return confirm('Are you sure you want to delete this presentation slot?')">
                                                 <i class="fas fa-trash-alt"></i>
                                             </button>
                                         </form>
@@ -144,7 +194,7 @@
                                     </a>
                                 </div>
                                 
-                                <!-- Sets associated with this presentation -->
+                                <!-- Sets associated with this presentation slot -->
                                 <h4 class="h6 mt-4 mb-3">
                                     <i class="fas fa-layer-group me-1"></i> Slide Sets
                                 </h4>
@@ -174,7 +224,7 @@
                                     </div>
                                 {% else %}
                                     <div class="alert alert-light">
-                                        <i class="fas fa-info-circle me-2"></i> No sets created for this presentation yet.
+                                        <i class="fas fa-info-circle me-2"></i> No sets created for this presentation slot yet.
                                         <p class="mb-0 mt-1">
                                             <a href="/select-slides/{{ presentation.pdf_id }}" class="alert-link">
                                                 Select slides
@@ -191,7 +241,7 @@
         {% else %}
             <div class="text-center py-5">
                 <i class="fas fa-file-upload fa-3x mb-3 text-muted"></i>
-                <p class="lead text-muted">No presentations uploaded yet.</p>
+                <p class="lead text-muted">No presentation slots uploaded yet.</p>
                 <p>Upload your first PowerPoint presentation to get started.</p>
             </div>
         {% endif %}
@@ -216,80 +266,37 @@
                 // We'll create a unique ID for this upload based on timestamp
                 const uploadId = Date.now().toString();
                 
-                // After a short delay to allow the form to submit, connect to WebSocket
-                setTimeout(() => {
-                    // Connect to WebSocket for progress updates
-                    const ws = new WebSocket(`ws://${window.location.host}/ws/upload-progress/${uploadId}`);
-                    
-                    ws.onopen = function() {
-                        console.log('Upload WebSocket connection established');
-                    };
-                    
-                    ws.onmessage = function(event) {
-                        const data = JSON.parse(event.data);
-                        console.log('Upload progress update:', data);
-                        
-                        // Update the progress bar and text
-                        const progressBar = document.getElementById('uploadProgressBar');
-                        const progressText = document.getElementById('uploadProgressText');
-                        const loadingMessage = document.getElementById('uploadLoadingMessage');
-                        
-                        // Update based on status
-                        switch(data.status) {
-                            case 'initializing':
-                                loadingMessage.textContent = 'Initializing...';
-                                progressText.textContent = 'Preparing your presentation';
-                                break;
-                            case 'converting_to_pdf':
-                                progressBar.style.width = '10%';
-                                loadingMessage.textContent = 'Converting PowerPoint to PDF...';
-                                progressText.textContent = 'This may take a moment';
-                                break;
-                            case 'uploading_pdf':
-                                progressBar.style.width = '20%';
-                                loadingMessage.textContent = 'Uploading PDF to storage...';
-                                progressText.textContent = 'Preparing for slide extraction';
-                                break;
-                            case 'downloading_pdf':
-                                progressBar.style.width = '30%';
-                                loadingMessage.textContent = 'Preparing to extract slides...';
-                                progressText.textContent = 'Getting ready to process slides';
-                                break;
-                            case 'processing':
-                                const percent = data.total > 0 ? (data.current / data.total) * 100 : 0;
-                                progressBar.style.width = `${30 + (percent * 0.6)}%`;  // 30% to 90%
-                                progressText.textContent = `Processing slide ${data.current + 1} of ${data.total}`;
-                                loadingMessage.textContent = 'Converting slides to images...';
-                                break;
-                            case 'complete':
-                                progressBar.style.width = '100%';
-                                loadingMessage.textContent = 'Complete! Redirecting...';
-                                if (data.total > 0) {
-                                    progressText.textContent = `All ${data.total} slides processed successfully`;
-                                } else {
-                                    progressText.textContent = 'Processing complete';
-                                }
-                                break;
-                            case 'error':
-                                loadingMessage.textContent = 'Error occurred. Please try again.';
-                                progressText.textContent = 'There was a problem processing your presentation';
-                                document.getElementById('uploadLoadingOverlay').classList.add('bg-danger', 'bg-opacity-75');
-                                break;
-                            default:
-                                // For any other status
-                                if (data.total > 0) {
-                                    progressText.textContent = `Processing ${data.total} slides`;
-                                }
-                        }
-                    };
-                    
-                    ws.onclose = function() {
-                        console.log('Upload WebSocket connection closed');
-                    };
-                    
-                    ws.onerror = function(error) {
-                        console.error('Upload WebSocket error:', error);
-                    };
+                // Get file information
+                const file = fileInput.files[0];
+                const fileName = file.name;
+                const fileSize = Math.round(file.size / 1024); // Size in KB
+                
+                // Show file information and loading animation
+                const progressBar = document.getElementById('uploadProgressBar');
+                const progressText = document.getElementById('uploadProgressText');
+                const loadingMessage = document.getElementById('uploadLoadingMessage');
+                
+                // Display presentation name and size
+                document.getElementById('fileNameDisplay').textContent = fileName;
+                document.getElementById('fileSizeDisplay').textContent = `${fileSize} KB`;
+                loadingMessage.textContent = `Processing: ${fileName}`;
+                
+                // Add warning for large presentations
+                if (fileSize > 1000) { // Assuming larger files have more slides
+                    const warningElement = document.createElement('div');
+                    warningElement.className = 'alert alert-warning';
+                    warningElement.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i> Please note, due to the size of the file, processing might take a bit longer than expected. But trust us, it\'s working.';
+                    document.getElementById('warningContainer').appendChild(warningElement);
+                }
+                
+                // Animate the progress bar - slower but steady animation
+                let progress = 0;
+                const interval = setInterval(() => {
+                    // Slowly increase progress up to 95%
+                    if (progress < 95) {
+                        progress += 0.5;
+                        progressBar.style.width = `${progress}%`;
+                    }
                 }, 500);
             });
         }

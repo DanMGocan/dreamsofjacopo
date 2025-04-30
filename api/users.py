@@ -5,7 +5,7 @@ from passlib.context import CryptContext
 from database_op.database import get_db  # Import the get_db function
 import mysql.connector
 from itsdangerous.exc import BadSignature, SignatureExpired
-from itsdangerous import URLSafeSerializer
+from itsdangerous import URLSafeTimedSerializer
 
 from helpers.email_utils import send_activation_email
 from helpers.flash_utils import set_flash_message
@@ -21,7 +21,7 @@ import os
 from datetime import datetime
 
 SECRET_KEY = os.getenv('SECRET_KEY')  # Ensure to set this in your .env file
-serializer = URLSafeSerializer(SECRET_KEY)
+serializer = URLSafeTimedSerializer(SECRET_KEY)
 
 users = APIRouter()
 
@@ -84,18 +84,10 @@ async def create_account(
         user_id = cursor.lastrowid  # Get the inserted user ID
 
         # Generate activation token
-        from itsdangerous import URLSafeTimedSerializer
-        serializer = URLSafeTimedSerializer(os.getenv('SECRET_KEY'))
         token = serializer.dumps(user_id, salt='activate-account')
 
         # Send activation email in the background
         background_tasks.add_task(send_activation_email, email, token)
-
-        # Generate activation token
-        token = serializer.dumps(user_id, salt='activate-account')
-
-        # Send activation email in the background
-        # background_tasks.add_task(send_activation_email, email, token)
 
         # Store user info in session and redirect to the dashboard
         request.session['user_id'] = user_id
@@ -233,29 +225,39 @@ async def logout(request: Request, response: Response):
     # Redirect to the login page after logout
     return RedirectResponse(url="/")
 
+# Route to display the upgrade page
+@users.get("/upgrade", response_class=HTMLResponse)
+async def show_upgrade_page(request: Request):
+    # Ensure the user is logged in
+    if 'user_id' not in request.session:
+        return RedirectResponse(url="/login")
+        
+    # Get user's current premium status
+    premium_status = request.session.get('premium_status', 0)
+    return templates.TemplateResponse("users/upgrade.html", {"request": request, "premium_status": premium_status})
+
 # Activation endpoint
 @users.get("/activate-account/{token}")
-async def activate_account(request: Request, token: str):
+async def activate_account(
+    request: Request, 
+    token: str,
+    db: mysql.connector.connection.MySQLConnection = Depends(get_db)
+):
     try:
         # Verify the token (valid for 1 hour)
         user_id = serializer.loads(token, salt='activate-account', max_age=3600)
     except SignatureExpired:
-        return templates.TemplateResponse("activation_failed.html", {"request": request, "message": "Activation link expired."})
+        return templates.TemplateResponse("users/activation_failed.html", {"request": request, "message": "Activation link expired."})
     except BadSignature:
-        return templates.TemplateResponse("activation_failed.html", {"request": request, "message": "Invalid activation link."})
+        return templates.TemplateResponse("users/activation_failed.html", {"request": request, "message": "Invalid activation link."})
 
     # Activate the user in the database
-    db = get_db()
-    if db is None:
-        raise HTTPException(status_code=500, detail="Database connection error")
-    
     try:
         cursor = db.cursor()
         update_query = "UPDATE user SET account_activated = %s WHERE user_id = %s"
         cursor.execute(update_query, (True, user_id))
         db.commit()
         cursor.close()
-        db.close()
 
         # Update the session to reflect that the account is activated
         request.session['account_activated'] = True
@@ -266,9 +268,9 @@ async def activate_account(request: Request, token: str):
         return response
 
     except mysql.connector.Error as e:
-        cursor.close()
-        db.close()
-        raise HTTPException(status_code=500, detail="Database error")
+        if 'cursor' in locals() and cursor:
+            cursor.close()
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
 @users.post("/resend-activation")
@@ -291,3 +293,99 @@ async def resend_activation(request: Request, background_tasks: BackgroundTasks)
     response = RedirectResponse(url="/dashboard", status_code=303)
     set_flash_message(response, "Activation email resent successfully")
     return response
+
+@users.post("/process-upgrade")
+async def process_upgrade(
+    request: Request,
+    db: mysql.connector.connection.MySQLConnection = Depends(get_db)
+):
+    """
+    Process the upgrade form submission.
+    In a real implementation, this would integrate with a payment processor.
+    For now, we'll just update the user's premium status in the database.
+    """
+    # Ensure the user is logged in
+    if 'user_id' not in request.session:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    user_id = request.session['user_id']
+    
+    try:
+        # Get form data
+        form = await request.form()
+        
+        # Check if a plan was selected (this would come from radio buttons in a real form)
+        selected_plan = form.get("selected_plan", "0")  # Default to free plan
+        
+        # Get à la carte options
+        additional_presentations = int(form.get("additional_presentations", "0"))
+        additional_storage_days = int(form.get("additional_storage_days", "0"))
+        additional_sets = int(form.get("additional_sets", "0"))
+        
+        # Convert selected_plan to an integer
+        premium_status = int(selected_plan)
+        
+        # Update the user's premium status in the database
+        cursor = db.cursor()
+        update_query = """
+            UPDATE user 
+            SET premium_status = %s,
+                additional_presentations = %s,
+                additional_storage_days = %s,
+                additional_sets = %s
+            WHERE user_id = %s
+        """
+        
+        # In a real implementation, we would check if these columns exist first
+        # For now, we'll assume they do or handle the error
+        try:
+            cursor.execute(update_query, (
+                premium_status,
+                additional_presentations,
+                additional_storage_days,
+                additional_sets,
+                user_id
+            ))
+            db.commit()
+        except mysql.connector.Error as e:
+            # If the columns don't exist, we'll need to alter the table
+            if "Unknown column" in str(e):
+                # Add the columns if they don't exist
+                alter_query = """
+                    ALTER TABLE user
+                    ADD COLUMN additional_presentations INT DEFAULT 0,
+                    ADD COLUMN additional_storage_days INT DEFAULT 0,
+                    ADD COLUMN additional_sets INT DEFAULT 0
+                """
+                cursor.execute(alter_query)
+                db.commit()
+                
+                # Try the update again
+                cursor.execute(update_query, (
+                    premium_status,
+                    additional_presentations,
+                    additional_storage_days,
+                    additional_sets,
+                    user_id
+                ))
+                db.commit()
+            else:
+                # If it's a different error, re-raise it
+                raise
+        
+        # Update the session
+        request.session['premium_status'] = premium_status
+        
+        # Redirect to the dashboard with a success message
+        response = RedirectResponse(url="/dashboard", status_code=303)
+        set_flash_message(response, "Your account has been upgraded successfully!")
+        return response
+        
+    except Exception as e:
+        # If anything goes wrong, redirect with an error message
+        response = RedirectResponse(url="/upgrade", status_code=303)
+        set_flash_message(response, f"Error processing upgrade: {str(e)}")
+        return response
+    finally:
+        if 'cursor' in locals() and cursor:
+            cursor.close()

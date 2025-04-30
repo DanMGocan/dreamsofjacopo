@@ -37,27 +37,7 @@ app.include_router(users.users)
 # Initialize templates
 templates = Jinja2Templates(directory="templates")
 
-# WebSocket endpoint for initial upload progress
-@app.websocket("/ws/upload-progress/{pdf_id}")
-async def websocket_upload_progress(websocket: WebSocket, pdf_id: str):
-    await websocket.accept()
-    
-    try:
-        # Keep connection open and send updates
-        while True:
-            if pdf_id in pdf_conversion_progress:
-                progress = pdf_conversion_progress[pdf_id]
-                await websocket.send_json(progress)
-                
-                # If process is complete or errored, close the connection
-                if progress["status"] in ["complete", "error"]:
-                    await websocket.close()
-                    break
-            
-            # Check for updates every second
-            await asyncio.sleep(1)
-    except Exception as e:
-        print(f"WebSocket error: {e}")
+# Progress tracking is now handled client-side with a simple animation
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
@@ -67,6 +47,11 @@ async def home(request: Request):
     
     # Otherwise show the login/home page
     return templates.TemplateResponse("/home.html", {"request": request})
+
+@app.get("/how-it-works", response_class=HTMLResponse)
+async def how_it_works(request: Request):
+    # Show the "How it works?" page
+    return templates.TemplateResponse("how_it_works.html", {"request": request})
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request, db: mysql.connector.connection.MySQLConnection = Depends(get_db)):

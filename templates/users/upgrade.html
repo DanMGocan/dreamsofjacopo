@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+
+{% block title %}Upgrade to Premium | SlidePull{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h1 class="text-center mb-4">Upgrade Your Account</h1>
+    <p class="lead text-center mb-5">Choose the plan that best fits your needs.</p>
+
+    <form id="upgradeForm" action="/process-upgrade" method="post">
+        <!-- Pricing Tiers -->
+        <div class="row row-cols-1 row-cols-md-3 mb-3 text-center">
+            <!-- Free Tier -->
+            <div class="col">
+                <div class="card mb-4 rounded-3 shadow-sm h-100">
+                    <div class="card-header py-3">
+                        <h4 class="my-0 fw-normal">Free</h4>
+                    </div>
+                    <div class="card-body d-flex flex-column">
+                        <h1 class="card-title pricing-card-title">€0<small class="text-muted fw-light">/mo</small></h1>
+                        <ul class="list-unstyled mt-3 mb-4">
+                            <li>1 Presentation Slot</li>
+                            <li>3 Days Storage</li>
+                            <li>20 Slides Maximum</li>
+                            <li>1 Set Max per Presentation</li>
+                        </ul>
+                        <div class="mt-auto">
+                            <button type="button" class="btn btn-lg w-100 {% if premium_status == 0 %}btn-success{% else %}btn-outline-primary{% endif %}" onclick="document.getElementById('freePlan').checked = true; calculateTotal();">
+                                {% if premium_status == 0 %}
+                                    <i class="fas fa-check-circle me-2"></i>Current Plan
+                                {% else %}
+                                    Select Plan
+                                {% endif %}
+                            </button>
+                            <div class="form-check d-none">
+                                <input class="form-check-input" type="radio" name="selected_plan" id="freePlan" value="0" 
+                                    {% if premium_status == 0 %}checked{% endif %}>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Premium Tier -->
+            <div class="col">
+                <div class="card mb-4 rounded-3 shadow-sm border-primary h-100">
+                    <div class="card-header py-3 text-bg-primary border-primary">
+                        <h4 class="my-0 fw-normal">Premium</h4>
+                    </div>
+                    <div class="card-body d-flex flex-column">
+                        <h1 class="card-title pricing-card-title">€5.99<small class="text-muted fw-light">/mo</small></h1>
+                        <ul class="list-unstyled mt-3 mb-4">
+                            <li>3 Presentation Slots</li>
+                            <li>21 Days Storage</li>
+                            <li>80 Slides Max per Presentation</li>
+                            <li>4 Sets Max per Presentation</li>
+                        </ul>
+                        <div class="mt-auto">
+                            <button type="button" class="btn btn-lg w-100 {% if premium_status == 1 %}btn-success{% else %}btn-primary{% endif %}" onclick="document.getElementById('premiumPlan').checked = true; calculateTotal();">
+                                {% if premium_status == 1 %}
+                                    <i class="fas fa-check-circle me-2"></i>Current Plan
+                                {% else %}
+                                    Select Plan
+                                {% endif %}
+                            </button>
+                            <div class="form-check d-none">
+                                <input class="form-check-input" type="radio" name="selected_plan" id="premiumPlan" value="1" 
+                                    {% if premium_status == 1 %}checked{% endif %}>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Corporate Tier -->
+            <div class="col">
+                <div class="card mb-4 rounded-3 shadow-sm h-100">
+                    <div class="card-header py-3">
+                        <h4 class="my-0 fw-normal">Corporate</h4>
+                    </div>
+                    <div class="card-body d-flex flex-column">
+                        <h1 class="card-title pricing-card-title">€11.99<small class="text-muted fw-light">/mo</small></h1>
+                        <ul class="list-unstyled mt-3 mb-4">
+                            <li>6 Presentation Slots</li>
+                            <li>60 Days Storage</li>
+                            <li>120 Slides Max per Presentation</li>
+                            <li>8 Sets Max per Presentation</li>
+                        </ul>
+                        <div class="mt-auto">
+                            <button type="button" class="btn btn-lg w-100 {% if premium_status == 2 %}btn-success{% else %}btn-outline-primary{% endif %}" onclick="document.getElementById('corporatePlan').checked = true; calculateTotal();">
+                                {% if premium_status == 2 %}
+                                    <i class="fas fa-check-circle me-2"></i>Current Plan
+                                {% else %}
+                                    Select Plan
+                                {% endif %}
+                            </button>
+                            <div class="form-check d-none">
+                                <input class="form-check-input" type="radio" name="selected_plan" id="corporatePlan" value="2" 
+                                    {% if premium_status == 2 %}checked{% endif %}>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row justify-content-center mt-5">
+            <div class="col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <div class="alert alert-info mb-4">
+                            <div class="d-flex justify-content-between align-items-center fw-bold">
+                                <span>Total:</span>
+                                <span id="totalPrice">€0.00</span>
+                            </div>
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="fas fa-crown me-2"></i>Upgrade Now
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.getElementById('upgradeForm');
+        const totalPriceSpan = document.getElementById('totalPrice');
+        const planRadios = document.querySelectorAll('input[name="selected_plan"]');
+        
+        // Plan prices
+        const planPrices = {
+            "0": 0,      // Free
+            "1": 5.99,   // Premium
+            "2": 11.99   // Corporate
+        };
+        
+        function calculateTotal() {
+            // Calculate base plan price
+            let selectedPlan = "0";
+            planRadios.forEach(radio => {
+                if (radio.checked) {
+                    selectedPlan = radio.value;
+                }
+            });
+            const total = planPrices[selectedPlan];
+            
+            // Update display
+            totalPriceSpan.textContent = `€${total.toFixed(2)}`;
+        }
+        
+        // Add event listeners
+        planRadios.forEach(radio => {
+            radio.addEventListener('change', calculateTotal);
+        });
+        
+        // Initial calculation
+        calculateTotal();
+        
+        // Make this function available globally
+        window.calculateTotal = calculateTotal;
+    });
+</script>
+
+{% endblock %}

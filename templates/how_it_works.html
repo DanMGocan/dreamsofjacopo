@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}How it works? | SlidePull{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header bg-white">
+        <h1 class="section-title h3 mb-0">
+            <i class="fas fa-question-circle me-2"></i> How SlidePull Works
+        </h1>
+    </div>
+    <div class="card-body">
+        <div class="row mb-5">
+            <div class="col-lg-12">
+                <p class="lead">SlidePull makes it easy to share specific slides from your presentations with your audience.</p>
+                <p>Whether you're a presenter, educator, or business professional, our platform helps you create QR codes that link directly to the slides you want to share.</p>
+            </div>
+        </div>
+
+        <div class="row mb-5">
+            <div class="col-md-4 text-center mb-4 mb-md-0">
+                <div class="bg-light-gray p-4 rounded-3 h-100">
+                    <div class="display-4 text-primary mb-3">
+                        <i class="fas fa-upload"></i>
+                    </div>
+                    <h3 class="h4">1. Upload</h3>
+                    <p>Upload your PowerPoint presentation to your account. We'll convert it to a PDF format that's easy to view on any device.</p>
+                </div>
+            </div>
+            <div class="col-md-4 text-center mb-4 mb-md-0">
+                <div class="bg-light-gray p-4 rounded-3 h-100">
+                    <div class="display-4 text-primary mb-3">
+                        <i class="fas fa-mouse-pointer"></i>
+                    </div>
+                    <h3 class="h4">2. Select</h3>
+                    <p>Choose which slides you want to include in your set. You can create multiple sets from a single presentation.</p>
+                </div>
+            </div>
+            <div class="col-md-4 text-center">
+                <div class="bg-light-gray p-4 rounded-3 h-100">
+                    <div class="display-4 text-primary mb-3">
+                        <i class="fas fa-qrcode"></i>
+                    </div>
+                    <h3 class="h4">3. Share</h3>
+                    <p>Generate a QR code for your slide set and share it with your audience. They can scan it to view your slides instantly.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-5">
+            <div class="col-lg-12">
+                <h2 class="h4 mb-4">Key Features</h2>
+                <div class="row">
+                    <div class="col-md-6 mb-4">
+                        <div class="d-flex">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-check-circle text-primary fa-2x me-3"></i>
+                            </div>
+                            <div>
+                                <h3 class="h5">Presentation Slots</h3>
+                                <p>Upload your presentations to dedicated slots in your account. Free users get 1 slot, while premium users get unlimited slots.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <div class="d-flex">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-check-circle text-primary fa-2x me-3"></i>
+                            </div>
+                            <div>
+                                <h3 class="h5">Slide Selection</h3>
+                                <p>Choose exactly which slides you want to include in each set. You can create multiple sets from a single presentation.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <div class="d-flex">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-check-circle text-primary fa-2x me-3"></i>
+                            </div>
+                            <div>
+                                <h3 class="h5">QR Code Generation</h3>
+                                <p>Generate QR codes for each slide set. Your audience can scan these codes to view your slides on any device.</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6 mb-4">
+                        <div class="d-flex">
+                            <div class="flex-shrink-0">
+                                <i class="fas fa-check-circle text-primary fa-2x me-3"></i>
+                            </div>
+                            <div>
+                                <h3 class="h5">Mobile-Friendly Viewing</h3>
+                                <p>Your slides are optimized for viewing on any device, including smartphones and tablets.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-12">
+                <h2 class="h4 mb-4">Account Tiers</h2>
+                <div class="table-responsive">
+                    <table class="table table-bordered">
+                        <thead class="bg-light-gray">
+                            <tr>
+                                <th>Feature</th>
+                                <th>Free</th>
+                                <th>Premium</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Presentation Slots</td>
+                                <td>1</td>
+                                <td>Unlimited</td>
+                            </tr>
+                            <tr>
+                                <td>Storage Duration</td>
+                                <td>3 days</td>
+                                <td>Unlimited</td>
+                            </tr>
+                            <tr>
+                                <td>Maximum Slides per Presentation</td>
+                                <td>20</td>
+                                <td>Unlimited</td>
+                            </tr>
+                            <tr>
+                                <td>Sets per Presentation</td>
+                                <td>1</td>
+                                <td>Unlimited</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div class="text-center mt-4">
+                    <a href="/upgrade" class="btn btn-primary btn-lg">
+                        <i class="fas fa-crown me-2"></i> Upgrade to Premium
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
