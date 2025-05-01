@@ -123,8 +123,8 @@ def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db):
     """
     # Set up image quality - we use 2x scaling for high-res images
     # This makes text crisp and readable even when zoomed in
-    zoom_x = 2.0  # 200% resolution horizontally
-    zoom_y = 2.0  # 200% resolution vertically
+    zoom_x = 1.0  # 200% resolution horizontally
+    zoom_y = 1.0  # 200% resolution vertically
     matrix = fitz.Matrix(zoom_x, zoom_y)  # PyMuPDF scaling matrix
     
     # Initialize progress tracking
