@@ -13,7 +13,7 @@ import json
 load_dotenv()
 
 import os
-from api import converter, users, qrcode
+from api import converter, users, qrcode, system
 from core.main_converter import conversion_progress as pdf_conversion_progress
 
 # Create an instance of FastAPI
@@ -33,6 +33,7 @@ app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__
 # Include the API routes
 app.include_router(converter.converter)
 app.include_router(users.users)
+app.include_router(system.system, prefix="/api/system")
 
 # Initialize templates
 templates = Jinja2Templates(directory="templates")
@@ -128,7 +129,8 @@ async def dashboard(request: Request, db: mysql.connector.connection.MySQLConnec
         "account_activated": account_activated,
         "premium_status": premium_status,
         "member_since": member_since,
-        "presentations": presentations  # Pass the list of presentations to the template
+        "presentations": presentations,  # Pass the list of presentations to the template
+        "show_system_monitor": True  # Enable the system monitor display
     })
 
 @app.get("/download-pdf/{pdf_id}")

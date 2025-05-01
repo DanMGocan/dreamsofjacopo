@@ -22,6 +22,7 @@ MarkupSafe==3.0.2
 mysql-connector-python==9.1.0
 passlib==1.7.4
 pillow==11.0.0
+psutil==5.9.8
 pycparser==2.22
 pydantic==2.10.2
 pydantic_core==2.27.1
