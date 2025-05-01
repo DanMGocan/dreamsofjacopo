@@ -1,4 +1,4 @@
-from fastapi import FastAPI, UploadFile, File, Request, Depends, WebSocket
+from fastapi import FastAPI, UploadFile, File, Request, Depends, WebSocket, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -38,6 +38,9 @@ app.include_router(system.system, prefix="/api/system")
 # Initialize templates
 templates = Jinja2Templates(directory="templates")
 
+# Admin email for access control
+ADMIN_EMAIL = "admin@slidepull.net"
+
 # Progress tracking is now handled client-side with a simple animation
 
 @app.get("/", response_class=HTMLResponse)
@@ -53,6 +56,27 @@ async def home(request: Request):
 async def how_it_works(request: Request):
     # Show the "How it works?" page
     return templates.TemplateResponse("how_it_works.html", {"request": request})
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_dashboard(request: Request):
+    """
+    Admin dashboard with system monitoring and management tools.
+    Only accessible to users with admin@slidepull.net email.
+    """
+    # Ensure the user is logged in
+    if 'email' not in request.session:
+        return RedirectResponse(url="/login")
+    
+    # Check if the user has admin access
+    if request.session['email'] != ADMIN_EMAIL:
+        # Redirect non-admin users to the regular dashboard
+        return RedirectResponse(url="/dashboard")
+    
+    # Render the admin template
+    return templates.TemplateResponse("admin.html", {
+        "request": request,
+        "email": request.session['email']
+    })
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request, db: mysql.connector.connection.MySQLConnection = Depends(get_db)):
@@ -120,6 +144,9 @@ async def dashboard(request: Request, db: mysql.connector.connection.MySQLConnec
 
     cursor.close()
 
+    # Check if the user is an admin and add admin link if they are
+    is_admin = email == ADMIN_EMAIL
+
     # Render the dashboard template with all the user and presentation data
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
@@ -130,7 +157,7 @@ async def dashboard(request: Request, db: mysql.connector.connection.MySQLConnec
         "premium_status": premium_status,
         "member_since": member_since,
         "presentations": presentations,  # Pass the list of presentations to the template
-        "show_system_monitor": True  # Enable the system monitor display
+        "is_admin": is_admin  # Pass admin status to show/hide admin link
     })
 
 @app.get("/download-pdf/{pdf_id}")
