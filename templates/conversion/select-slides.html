@@ -73,29 +73,23 @@
                         <!-- Set Name and Submit -->
                         <div class="card bg-light-gray mb-4">
                             <div class="card-body">
-                                <div class="row">
-                                    <div class="col-md-8">
-                                        <div class="mb-3 mb-md-0">
-                                            <label for="set_name" class="form-label">Set Name:</label>
-                                            <input type="text" id="set_name" name="set_name" 
-                                                   class="form-control" 
-                                                   placeholder="Enter a descriptive name for this set" 
-                                                   pattern="[A-Za-z0-9_-]+" 
-                                                   title="No spaces allowed. Use letters, numbers, underscores or hyphens only."
-                                                   required>
-                                            <div class="form-text text-danger">
-                                                <strong>Important:</strong> No spaces allowed. Use letters, numbers, underscores or hyphens only.
-                                            </div>
-                                            <div class="form-text" id="set_name_preview">
-                                                Preview: <span id="name_preview"></span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-4 d-flex align-items-end">
-                                        <button type="submit" class="btn btn-primary w-100" id="generateBtn">
-                                            <i class="fas fa-qrcode me-1"></i> Generate QR Code
-                                        </button>
-                                    </div>
+                                <label for="set_name" class="form-label">Set Name:</label>
+                                <div class="d-flex align-items-center gap-2"> {# Flexbox container for input and button, added gap-2 back #}
+                                    <input type="text" id="set_name" name="set_name"
+                                           class="form-control" style="flex-basis: 70%; flex-grow: 1;" {# Set flex-basis and flex-grow #}
+                                           placeholder="Enter a descriptive name for this set"
+                                           pattern="[A-Za-z0-9_-]+"
+                                           title="No spaces allowed. Use letters, numbers, underscores or hyphens only."
+                                           required>
+                                    <button type="submit" class="btn btn-primary" id="generateBtn" style="flex-basis: 30%; flex-shrink: 0;"> {# Set flex-basis and flex-shrink #}
+                                        <i class="fas fa-qrcode me-1"></i> Create Set and Generate QR Code {# Changed button text #}
+                                    </button>
+                                </div>
+                                <div class="form-text text-danger">
+                                    <strong>Important:</strong> No spaces allowed. Use letters, numbers, underscores or hyphens only.
+                                </div>
+                                <div class="form-text" id="set_name_preview">
+                                    Preview: <span id="name_preview"></span>
                                 </div>
                             </div>
                         </div>
