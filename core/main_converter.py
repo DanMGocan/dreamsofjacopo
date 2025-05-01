@@ -1,9 +1,10 @@
-
 import os
 import io
 import fitz  # PyMuPDF
 import subprocess
 import requests
+import logging
+import time
 from azure.storage.blob import BlobServiceClient
 from fastapi import HTTPException, Request, Depends
 import tempfile
@@ -12,6 +13,10 @@ import mysql.connector
 from datetime import datetime, timedelta
 from helpers.blob_op import generate_sas_token_for_file
 from helpers.blob_op import upload_to_blob
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Get Azure Blob settings from environment variables
 # We're using these to store all our files in the cloud
@@ -46,10 +51,43 @@ def convert_pptx_bytes_to_pdf(pptx_bytes, request: Request):
             # Find LibreOffice on this system
             soffice_path = os.getenv("SOFFICE_PATH", r'C:\Program Files\LibreOffice\program\soffice.exe')
 
+            # Get the size of the PowerPoint file to estimate conversion time
+            pptx_size_mb = os.path.getsize(temp_pptx_path) / (1024 * 1024)
+            
+            # Estimate timeout based on file size and available resources
+            # For low-resource environments, we need to allow more time
+            # Base timeout of 120 seconds + 30 seconds per MB
+            estimated_timeout = 120 + (pptx_size_mb * 30)
+            
+            # Cap the timeout at a reasonable maximum (10 minutes)
+            timeout = min(estimated_timeout, 600)
+            
+            logger.info(f"Converting PPTX to PDF (size: {pptx_size_mb:.2f} MB, timeout: {timeout:.0f} seconds)")
+
             # Run LibreOffice in headless mode to do the conversion
             # This is way faster than using COM automation or other methods
-            subprocess.run([soffice_path, '--headless', '--convert-to', 'pdf', 
-                           temp_pptx_path, '--outdir', temp_dir], check=True, timeout=120)
+            try:
+                # First, make sure no existing LibreOffice processes are hanging around
+                # This helps prevent conflicts on low-resource systems
+                try:
+                    if os.name == 'posix':  # Linux/Unix
+                        subprocess.run(['pkill', 'soffice'], stderr=subprocess.DEVNULL)
+                        time.sleep(1)  # Give it a moment to clean up
+                except Exception:
+                    pass  # Ignore errors from pkill
+                
+                # Run the conversion with the calculated timeout
+                subprocess.run([soffice_path, '--headless', '--convert-to', 'pdf', 
+                               temp_pptx_path, '--outdir', temp_dir], 
+                               check=True, timeout=timeout)
+            except subprocess.TimeoutExpired:
+                logger.error(f"LibreOffice conversion timed out after {timeout} seconds")
+                raise Exception(f"The presentation took too long to convert. This may be due to its size or complexity. Please try a smaller or simpler presentation, or try again later when the server is less busy.")
+
+            # Check if the PDF was actually created
+            if not os.path.exists(temp_pdf_path):
+                logger.error("PDF file was not created by LibreOffice")
+                raise Exception("Failed to convert PPTX to PDF: Output file was not created")
 
             # Read the converted PDF back into memory
             with open(temp_pdf_path, "rb") as pdf_file:
@@ -59,9 +97,11 @@ def convert_pptx_bytes_to_pdf(pptx_bytes, request: Request):
 
     except subprocess.CalledProcessError as e:
         # This happens if LibreOffice fails to convert the file
+        logger.error(f"LibreOffice conversion failed: {e}")
         raise Exception(f"Failed to convert PPTX to PDF: {e}")
     except Exception as e:
         # Catch any other unexpected errors
+        logger.error(f"Unexpected error during conversion: {e}")
         raise Exception(f"Unexpected error during conversion: {e}")
 
 # Dictionary to track conversion progress
@@ -95,6 +135,7 @@ def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db):
         "status": "initializing"
     }
 
+    cursor = None
     try:
         cursor = db.cursor(dictionary=True, buffered=True)
 
@@ -106,7 +147,7 @@ def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db):
         pdf_blob_url = f"https://{AZURE_STORAGE_ACCOUNT_NAME}.blob.core.windows.net/{AZURE_BLOB_CONTAINER_NAME}/{pdf_blob_name}"
         pdf_blob_url_with_sas = f"{pdf_blob_url}?{sas_token_pdf}"
 
-        print(f"Downloading PDF from Azure: {pdf_blob_url_with_sas}")
+        logger.info(f"Downloading PDF from Azure: {pdf_blob_url}")
         conversion_progress[str_pdf_id]["status"] = "downloading_pdf"
 
         # Download the PDF file
@@ -124,7 +165,7 @@ def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db):
         total_pages = len(pdf_document)
         conversion_progress[str_pdf_id]["total"] = total_pages
         conversion_progress[str_pdf_id]["status"] = "processing"
-        print(f"Processing {total_pages} pages from PDF")
+        logger.info(f"Processing {total_pages} pages from PDF")
 
         # We'll make thumbnails 300px wide - good balance of size and quality
         thumbnail_width = 300
@@ -180,7 +221,7 @@ def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db):
             # Commit after each page to avoid losing work if there's an error
             db.commit()
             
-            print(f"Processed page {page_number + 1}/{total_pages}")
+            logger.info(f"Processed page {page_number + 1}/{total_pages}")
 
         # Update progress to complete
         conversion_progress[str_pdf_id]["current"] = total_pages
@@ -193,7 +234,11 @@ def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db):
 
     except Exception as e:
         # If anything goes wrong, undo any partial database changes
-        db.rollback()
+        logger.error(f"Error converting PDF to images: {e}")
+        try:
+            db.rollback()
+        except Exception as rollback_err:
+            logger.error(f"Error during rollback: {rollback_err}")
         
         # Update progress with error
         if str_pdf_id in conversion_progress:
@@ -202,4 +247,8 @@ def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db):
         raise Exception(f"Error converting PDF to images: {e}")
     finally:
         # Always close the database cursor
-        cursor.close()
+        if cursor:
+            try:
+                cursor.close()
+            except Exception as cursor_err:
+                logger.error(f"Error closing cursor: {cursor_err}")
