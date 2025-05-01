@@ -14,7 +14,7 @@ from core.qr_generator import generate_qr
 
 from dotenv import load_dotenv
 from azure.storage.blob import BlobServiceClient, BlobClient
-from database_op.database import get_db
+from database_op.database import get_db, get_connection
 import mysql.connector
 from mysql.connector import connection
 
@@ -24,6 +24,11 @@ from typing import List, Optional, Dict
 from pydantic import parse_obj_as
 from datetime import datetime, timedelta
 import asyncio
+import traceback
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Load our configuration from environment variables
 load_dotenv()
@@ -51,6 +56,18 @@ templates = Jinja2Templates(directory="templates")
 
 # Store active conversion progress
 conversion_progress: Dict[str, Dict] = {}
+
+def verify_db_connection(db):
+    """Verify that the database connection is still valid"""
+    try:
+        cursor = db.cursor()
+        cursor.execute("SELECT 1")
+        cursor.fetchone()
+        cursor.close()
+        return True
+    except mysql.connector.Error:
+        logger.error("Database connection is no longer valid")
+        return False
 
 @converter.post("/upload-pptx")
 async def upload_pptx(
@@ -84,7 +101,22 @@ async def upload_pptx(
         "status": "initializing"
     }
     
+    cursor = None
     try:
+        # Verify database connection is valid
+        if not verify_db_connection(db):
+            logger.error("Database connection is invalid at the start of upload_pptx")
+            # Try to get a new connection
+            try:
+                db = get_connection()
+            except Exception as e:
+                logger.error(f"Failed to get a new database connection: {e}")
+                conversion_progress[upload_id]["status"] = "error"
+                raise HTTPException(
+                    status_code=500,
+                    detail="Database connection error. Please try again later."
+                )
+
         # Get the current user's information
         user_data = await get_user_data_from_session(request, db)
         user_id = user_data['user_id']
@@ -93,17 +125,27 @@ async def upload_pptx(
 
         # Free users can only have one presentation at a time
         if premium_status == 0:
-            cursor = db.cursor(dictionary=True, buffered=True)
-            cursor.execute("SELECT pdf_id FROM pdf WHERE user_id = %s", (user_id,))
-            existing_pdf = cursor.fetchone()
-            if existing_pdf:
-                cursor.close()
+            try:
+                cursor = db.cursor(dictionary=True, buffered=True)
+                cursor.execute("SELECT pdf_id FROM pdf WHERE user_id = %s", (user_id,))
+                existing_pdf = cursor.fetchone()
+                if existing_pdf:
+                    conversion_progress[upload_id]["status"] = "error"
+                    raise HTTPException(
+                        status_code=403, 
+                        detail="Free users can only have one presentation. Please delete your existing presentation before uploading a new one."
+                    )
+            except mysql.connector.Error as db_err:
+                logger.error(f"Database error when checking existing PDFs: {db_err}")
                 conversion_progress[upload_id]["status"] = "error"
                 raise HTTPException(
-                    status_code=403, 
-                    detail="Free users can only have one presentation. Please delete your existing presentation before uploading a new one."
+                    status_code=500,
+                    detail="Database connection error. Please try again later."
                 )
-            cursor.close()
+            finally:
+                if cursor:
+                    cursor.close()
+                    cursor = None
 
         # Get the original filename and clean it up for storage
         original_filename = pptx_file.filename
@@ -140,25 +182,50 @@ async def upload_pptx(
         # Store the base URL (without token) in our database
         pdf_blob_url = f"https://{AZURE_STORAGE_ACCOUNT_NAME}.blob.core.windows.net/{AZURE_BLOB_CONTAINER_NAME}/{pdf_blob_name}"
         
-        # Save the PDF information to our database
-        cursor = db.cursor(dictionary=True, buffered=True)
-        cursor.execute(
-            "INSERT INTO pdf (user_id, original_filename, url, sas_token, sas_token_expiry) VALUES (%s, %s, %s, %s, %s)",
-            (user_id, original_filename, pdf_blob_url, sas_token_pdf, sas_token_expiry)
-        )
-        db.commit()
+        # Verify database connection is still valid before saving PDF information
+        if not verify_db_connection(db):
+            logger.error("Database connection lost before saving PDF information")
+            # Try to get a new connection
+            try:
+                db = get_connection()
+            except Exception as e:
+                logger.error(f"Failed to get a new database connection: {e}")
+                conversion_progress[upload_id]["status"] = "error"
+                raise HTTPException(
+                    status_code=500,
+                    detail="Database connection error. Please try again later."
+                )
         
-        # Get the ID of the newly created PDF record
-        pdf_id = cursor.lastrowid
-        cursor.close()
+        # Save the PDF information to our database
+        try:
+            cursor = db.cursor(dictionary=True, buffered=True)
+            cursor.execute(
+                "INSERT INTO pdf (user_id, original_filename, url, sas_token, sas_token_expiry) VALUES (%s, %s, %s, %s, %s)",
+                (user_id, original_filename, pdf_blob_url, sas_token_pdf, sas_token_expiry)
+            )
+            db.commit()
+            
+            # Get the ID of the newly created PDF record
+            pdf_id = cursor.lastrowid
+        except mysql.connector.Error as db_err:
+            logger.error(f"Database error when saving PDF information: {db_err}")
+            conversion_progress[upload_id]["status"] = "error"
+            raise HTTPException(
+                status_code=500,
+                detail="Database error when saving PDF information. Please try again later."
+            )
+        finally:
+            if cursor:
+                cursor.close()
+                cursor = None
         
         # Update the upload_id in the conversion_progress dictionary to match the pdf_id
         # This allows the WebSocket to track progress using the pdf_id
-        print(f"Updating progress tracking: upload_id={upload_id} -> pdf_id={pdf_id}")
-        print(f"Current progress data: {conversion_progress[upload_id]}")
+        logger.info(f"Updating progress tracking: upload_id={upload_id} -> pdf_id={pdf_id}")
+        logger.info(f"Current progress data: {conversion_progress[upload_id]}")
         conversion_progress[str(pdf_id)] = conversion_progress[upload_id]
         del conversion_progress[upload_id]
-        print(f"Progress data now tracked under pdf_id={pdf_id}: {conversion_progress[str(pdf_id)]}")
+        logger.info(f"Progress data now tracked under pdf_id={pdf_id}: {conversion_progress[str(pdf_id)]}")
 
         # Step 2: Convert the PDF to images and thumbnails
         # This function will update the progress in the conversion_progress dictionary
@@ -171,19 +238,35 @@ async def upload_pptx(
 
     except Exception as e:
         # If anything goes wrong, undo any partial database changes
-        db.rollback()
+        logger.error(f"Error in upload_pptx: {str(e)}")
+        logger.error(traceback.format_exc())  # Log the full stack trace
+        
+        try:
+            if verify_db_connection(db):
+                db.rollback()
+            else:
+                logger.error("Could not rollback because database connection is invalid")
+        except Exception as rollback_err:
+            logger.error(f"Error during rollback: {str(rollback_err)}")
         
         # Update progress with error
         conversion_progress[upload_id]["status"] = "error"
         
-        return {"error": f"Failed to upload and process file: {str(e)}"}
+        # Return a more specific error message
+        if isinstance(e, HTTPException):
+            raise e
+        else:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to upload and process file: {str(e)}"
+            )
     finally:
         # Make sure we always close the database cursor
-        try:
-            if 'cursor' in locals() and cursor:
+        if cursor:
+            try:
                 cursor.close()
-        except:
-            pass
+            except Exception as cursor_err:
+                logger.error(f"Error closing cursor: {str(cursor_err)}")
 
 from azure.core.exceptions import ResourceNotFoundError
 
@@ -208,8 +291,22 @@ async def delete_presentation(
         return RedirectResponse(url="/login")
 
     user_id = request.session['user_id']
+    cursor = None
 
     try:
+        # Verify database connection is valid
+        if not verify_db_connection(db):
+            logger.error("Database connection is invalid at the start of delete_presentation")
+            # Try to get a new connection
+            try:
+                db = get_connection()
+            except Exception as e:
+                logger.error(f"Failed to get a new database connection: {e}")
+                raise HTTPException(
+                    status_code=500,
+                    detail="Database connection error. Please try again later."
+                )
+
         # Get the presentation details from the database
         cursor = db.cursor(dictionary=True, buffered=True)
         cursor.execute("""
@@ -234,7 +331,7 @@ async def delete_presentation(
             blob_client.delete_blob()
         except ResourceNotFoundError:
             # It's okay if the file is already gone
-            print(f"PDF already deleted: {pdf_blob_url_with_sas}")
+            logger.info(f"PDF already deleted: {pdf_blob_url_with_sas}")
 
         # Step 2: Delete all the full-size slide images
         cursor.execute("SELECT url, sas_token FROM image WHERE pdf_id = %s", (pdf_id,))
@@ -245,7 +342,7 @@ async def delete_presentation(
                 image_blob_client = BlobClient.from_blob_url(image_blob_url_with_sas)
                 image_blob_client.delete_blob()
             except ResourceNotFoundError:
-                print(f"Image already deleted: {image_blob_url_with_sas}")
+                logger.info(f"Image already deleted: {image_blob_url_with_sas}")
 
         # Step 3: Delete all the thumbnails
         cursor.execute("SELECT url, sas_token FROM thumbnail WHERE pdf_id = %s", (pdf_id,))
@@ -256,7 +353,7 @@ async def delete_presentation(
                 thumbnail_blob_client = BlobClient.from_blob_url(thumbnail_blob_url_with_sas)
                 thumbnail_blob_client.delete_blob()
             except ResourceNotFoundError:
-                print(f"Thumbnail already deleted: {thumbnail_blob_url_with_sas}")
+                logger.info(f"Thumbnail already deleted: {thumbnail_blob_url_with_sas}")
 
         # Step 4: Delete any QR code folders
         try:
@@ -269,7 +366,7 @@ async def delete_presentation(
             )
             qr_code_container_client.delete_blob()
         except ResourceNotFoundError:
-            print(f"QR code folder already deleted or doesn't exist: {qr_code_folder_path}")
+            logger.info(f"QR code folder already deleted or doesn't exist: {qr_code_folder_path}")
 
         # Step 5: Delete any set folders
         try:
@@ -282,7 +379,23 @@ async def delete_presentation(
             )
             set_container_client.delete_blob()
         except ResourceNotFoundError:
-            print(f"Set folder already deleted or doesn't exist: {set_folder_path}")
+            logger.info(f"Set folder already deleted or doesn't exist: {set_folder_path}")
+
+        # Verify database connection is still valid before deleting records
+        if not verify_db_connection(db):
+            logger.error("Database connection lost before deleting records")
+            # Try to get a new connection
+            try:
+                db = get_connection()
+                # Need to recreate the cursor with the new connection
+                cursor.close()
+                cursor = db.cursor(dictionary=True, buffered=True)
+            except Exception as e:
+                logger.error(f"Failed to get a new database connection: {e}")
+                raise HTTPException(
+                    status_code=500,
+                    detail="Database connection error. Please try again later."
+                )
 
         # Step 6: Delete all database records
         cursor.execute("DELETE FROM image WHERE pdf_id = %s", (pdf_id,))
@@ -298,12 +411,29 @@ async def delete_presentation(
 
     except Exception as e:
         # If anything goes wrong, undo any partial database changes
-        db.rollback()
-        raise HTTPException(status_code=500, detail=f"Error deleting presentation: {e}")
+        logger.error(f"Error in delete_presentation: {str(e)}")
+        logger.error(traceback.format_exc())  # Log the full stack trace
+        
+        try:
+            if verify_db_connection(db):
+                db.rollback()
+            else:
+                logger.error("Could not rollback because database connection is invalid")
+        except Exception as rollback_err:
+            logger.error(f"Error during rollback: {str(rollback_err)}")
+            
+        if isinstance(e, HTTPException):
+            raise e
+        else:
+            raise HTTPException(status_code=500, detail=f"Error deleting presentation: {e}")
 
     finally:
         # Always close the database cursor
-        cursor.close()
+        if cursor:
+            try:
+                cursor.close()
+            except Exception as cursor_err:
+                logger.error(f"Error closing cursor: {str(cursor_err)}")
 
 @converter.get("/select-slides/{pdf_id}", response_class=HTMLResponse)
 async def select_thumbnails(
@@ -321,18 +451,42 @@ async def select_thumbnails(
     if 'user_id' not in request.session:
         return RedirectResponse(url="/login")
 
-    # Get all the thumbnails for this presentation
-    cursor = db.cursor(dictionary=True)
-    cursor.execute("SELECT thumbnail_id, url, sas_token FROM thumbnail WHERE pdf_id = %s", (pdf_id,))
-    thumbnails = cursor.fetchall()
-    cursor.close()
+    cursor = None
+    try:
+        # Verify database connection is valid
+        if not verify_db_connection(db):
+            logger.error("Database connection is invalid at the start of select_thumbnails")
+            # Try to get a new connection
+            try:
+                db = get_connection()
+            except Exception as e:
+                logger.error(f"Failed to get a new database connection: {e}")
+                raise HTTPException(
+                    status_code=500,
+                    detail="Database connection error. Please try again later."
+                )
 
-    # Show the slide selection page
-    return templates.TemplateResponse("conversion/select-slides.html", {
-        "request": request,
-        "pdf_id": pdf_id,
-        "thumbnails": thumbnails
-    })
+        # Get all the thumbnails for this presentation
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("SELECT thumbnail_id, url, sas_token FROM thumbnail WHERE pdf_id = %s", (pdf_id,))
+        thumbnails = cursor.fetchall()
+
+        # Show the slide selection page
+        return templates.TemplateResponse("conversion/select-slides.html", {
+            "request": request,
+            "pdf_id": pdf_id,
+            "thumbnails": thumbnails
+        })
+    except Exception as e:
+        logger.error(f"Error in select_thumbnails: {str(e)}")
+        logger.error(traceback.format_exc())  # Log the full stack trace
+        raise HTTPException(status_code=500, detail=f"Error loading thumbnails: {str(e)}")
+    finally:
+        if cursor:
+            try:
+                cursor.close()
+            except Exception as cursor_err:
+                logger.error(f"Error closing cursor: {str(cursor_err)}")
 
 import logging
 
@@ -359,6 +513,7 @@ def generate_set(
     the slides the presenter wanted to share.
     """
     logging.info("Starting to generate a new slide set")
+    cursor = None
 
     # Make sure the user is logged in
     if 'user_id' not in request.session:
@@ -385,6 +540,20 @@ def generate_set(
     }
 
     try:
+        # Verify database connection is valid
+        if not verify_db_connection(db):
+            logger.error("Database connection is invalid at the start of generate_set")
+            # Try to get a new connection
+            try:
+                db = get_connection()
+            except Exception as e:
+                logger.error(f"Failed to get a new database connection: {e}")
+                conversion_progress[str_pdf_id]["status"] = "error"
+                raise HTTPException(
+                    status_code=500,
+                    detail="Database connection error. Please try again later."
+                )
+
         # Get the user's information
         user_id = request.session['user_id']
         selected_thumbnail_ids = parse_obj_as(List[int], selected_thumbnails)
@@ -396,6 +565,7 @@ def generate_set(
         cursor.execute("SELECT alias FROM user WHERE user_id = %s", (user_id,))
         user_data = cursor.fetchone()
         cursor.close()
+        cursor = None
 
         if not user_data or 'alias' not in user_data:
             logging.error(f"Couldn't find alias for user {user_id}")
@@ -416,6 +586,7 @@ def generate_set(
         cursor.execute(query, tuple(selected_thumbnail_ids))
         images = cursor.fetchall()
         cursor.close()
+        cursor = None
 
         logging.info(f"Found {len(images)} images for the selected slides")
 
@@ -493,6 +664,20 @@ def generate_set(
         
         logging.info(f"QR code generated at {qr_code_url}")
 
+        # Verify database connection is still valid before saving to database
+        if not verify_db_connection(db):
+            logger.error("Database connection lost before saving to database")
+            # Try to get a new connection
+            try:
+                db = get_connection()
+            except Exception as e:
+                logger.error(f"Failed to get a new database connection: {e}")
+                conversion_progress[str_pdf_id]["status"] = "error"
+                raise HTTPException(
+                    status_code=500,
+                    detail="Database connection error. Please try again later."
+                )
+
         # Step 5: Save everything to the database
         conversion_progress[str_pdf_id]["status"] = "saving"
         
@@ -517,6 +702,7 @@ def generate_set(
         )
         db.commit()
         cursor.close()
+        cursor = None
         
         # Mark process as complete
         conversion_progress[str_pdf_id]["status"] = "complete"
@@ -529,13 +715,29 @@ def generate_set(
     except Exception as e:
         # If anything goes wrong, undo any partial database changes
         logging.exception(f"Error generating set: {e}")
-        db.rollback()
+        
+        try:
+            if verify_db_connection(db):
+                db.rollback()
+            else:
+                logger.error("Could not rollback because database connection is invalid")
+        except Exception as rollback_err:
+            logger.error(f"Error during rollback: {str(rollback_err)}")
         
         # Update progress with error
         if str_pdf_id in conversion_progress:
             conversion_progress[str_pdf_id]["status"] = "error"
             
-        raise HTTPException(
-            status_code=500, 
-            detail="Something went wrong while creating your set. Please try again or contact support."
-        )
+        if isinstance(e, HTTPException):
+            raise e
+        else:
+            raise HTTPException(
+                status_code=500, 
+                detail="Something went wrong while creating your set. Please try again or contact support."
+            )
+    finally:
+        if cursor:
+            try:
+                cursor.close()
+            except Exception as cursor_err:
+                logger.error(f"Error closing cursor: {str(cursor_err)}")
