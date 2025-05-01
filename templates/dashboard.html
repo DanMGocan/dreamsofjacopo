@@ -238,16 +238,16 @@
                                 </div>
                             </div>
                             <div class="card-body d-flex flex-column">
-                                {# Add placeholders for number of slides and size - data not available in current template variables #}
-                                <p class="card-text mb-2"><small class="text-muted">Slides: N/A</small></p>
-                                <p class="card-text mb-3"><small class="text-muted">Size: N/A</small></p>
+                                {# Display number of slides and size #}
+                                <p class="card-text mb-2"><small class="text-muted">Slides: {{ presentation.num_slides }}</small></p>
+                                <p class="card-text mb-3"><small class="text-muted">Size: {{ presentation.file_size_kb }} KB</small></p>
 
                                 <div class="d-flex flex-wrap gap-2 mb-3">
                                     <a href="/select-slides/{{ presentation.pdf_id }}" class="btn btn-primary btn-sm flex-grow-1">
                                         <i class="fas fa-images me-1"></i> Create new set
                                     </a>
-                                    <a href="{{ presentation.url_with_sas }}" target="_blank" class="btn btn-outline-secondary btn-sm flex-grow-1">
-                                        <i class="fas fa-download me-1"></i> Download as .pdf
+                                    <a href="#" class="btn btn-outline-secondary btn-sm flex-grow-1 download-qr-btn" data-pdf-id="{{ presentation.pdf_id }}">
+                                        <i class="fas fa-qrcode me-1"></i> Download QR Code for .pdf file
                                     </a>
                                 </div>
 
@@ -339,6 +339,64 @@
                 }, 500);
             });
         }
+    });
+
+    // Handle QR code download button click
+    document.querySelectorAll('.download-qr-btn').forEach(button => {
+        button.addEventListener('click', async function(e) {
+            e.preventDefault(); // Prevent default link behavior
+
+            const pdfId = this.dataset.pdfId;
+            const filenameElement = this.closest('.card').querySelector('.card-header h3');
+            let originalFilename = 'presentation'; // Default filename
+            if (filenameElement) {
+                originalFilename = filenameElement.textContent.trim(); // Get filename from h3
+            }
+            const baseFilename = originalFilename.replace(/\.[^/.]+$/, ""); // Remove extension
+
+            try {
+                // Show a simple loading indicator (optional, could enhance with a modal)
+                button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Generating...';
+                button.disabled = true;
+
+                const response = await fetch(`/generate-pdf-qr/${pdfId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json', // Or appropriate content type if sending a body
+                    },
+                    // If you need to send any data in the body, add it here:
+                    // body: JSON.stringify({ key: 'value' }),
+                });
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP error! status: ${response.status}, detail: ${errorText}`);
+                }
+
+                const blob = await response.blob();
+
+                // Create a link element and trigger the download
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.style.display = 'none';
+                a.href = url;
+                a.download = `${baseFilename}_qr.png`; // Set desired filename
+                document.body.appendChild(a);
+                a.click();
+
+                // Clean up
+                window.URL.revokeObjectURL(url);
+                a.remove();
+
+            } catch (error) {
+                console.error('Error downloading QR code:', error);
+                alert('Failed to generate or download QR code. Please try again.');
+            } finally {
+                 // Restore button state
+                 button.innerHTML = '<i class="fas fa-qrcode me-1"></i> Download QR Code for .pdf file';
+                 button.disabled = false;
+            }
+        });
     });
 </script>
 

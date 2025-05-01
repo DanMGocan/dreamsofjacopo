@@ -21,6 +21,8 @@ CREATE TABLE pdf (
     original_filename VARCHAR(255),
     sas_token VARCHAR(256) NOT NULL,
     sas_token_expiry DATETIME,
+    num_slides INT DEFAULT 0, -- Added column for number of slides
+    file_size_kb INT DEFAULT 0, -- Added column for file size in KB
     FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE
 );
 

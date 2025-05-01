@@ -151,6 +151,9 @@ async def upload_pptx(
         original_filename = pptx_file.filename
         sanitized_filename = original_filename.replace(" ", "_").replace(".pptx", ".pdf")
 
+        # Get the file size in kilobytes
+        file_size_kb = round(pptx_file.size / 1024)
+
         # Read the uploaded PowerPoint file
         pptx_bytes = await pptx_file.read()
         
@@ -200,8 +203,8 @@ async def upload_pptx(
         try:
             cursor = db.cursor(dictionary=True, buffered=True)
             cursor.execute(
-                "INSERT INTO pdf (user_id, original_filename, url, sas_token, sas_token_expiry) VALUES (%s, %s, %s, %s, %s)",
-                (user_id, original_filename, pdf_blob_url, sas_token_pdf, sas_token_expiry)
+                "INSERT INTO pdf (user_id, original_filename, url, sas_token, sas_token_expiry, file_size_kb) VALUES (%s, %s, %s, %s, %s, %s)",
+                (user_id, original_filename, pdf_blob_url, sas_token_pdf, sas_token_expiry, file_size_kb)
             )
             db.commit()
             
@@ -229,7 +232,24 @@ async def upload_pptx(
 
         # Step 2: Convert the PDF to images and thumbnails
         # This function will update the progress in the conversion_progress dictionary
-        convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db)
+        # It now also returns the number of slides
+        num_slides = convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db)
+
+        # Update the number of slides in the database record
+        try:
+            cursor = db.cursor()
+            cursor.execute(
+                "UPDATE pdf SET num_slides = %s WHERE pdf_id = %s",
+                (num_slides, pdf_id)
+            )
+            db.commit()
+        except mysql.connector.Error as db_err:
+            logger.error(f"Database error when updating number of slides: {db_err}")
+            # This is not a critical error, so we log it but don't raise an HTTPException
+            # The presentation is still uploaded and processed, just slide count might be missing
+        finally:
+            if cursor:
+                cursor.close()
 
         # Redirect back to the dashboard with a success message
         response = RedirectResponse(url="/dashboard", status_code=303)

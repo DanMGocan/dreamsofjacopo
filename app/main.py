@@ -33,6 +33,7 @@ app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__
 # Include the API routes
 app.include_router(converter.converter)
 app.include_router(users.users)
+app.include_router(qrcode.qrcode) # Include the QR code router
 app.include_router(system.system, prefix="/api/system")
 
 # Initialize templates
@@ -99,6 +100,7 @@ async def dashboard(request: Request, db: mysql.connector.connection.MySQLConnec
     # Fetch presentations and associated sets using LEFT JOIN
     cursor.execute("""
         SELECT pdf.pdf_id, pdf.original_filename, pdf.url, pdf.sas_token, pdf.sas_token_expiry AS uploaded_on,
+               pdf.num_slides, pdf.file_size_kb,
                `set`.set_id, `set`.name AS set_name, `set`.qrcode_url, `set`.qrcode_sas_token
         FROM pdf
         LEFT JOIN `set` ON pdf.pdf_id = `set`.pdf_id
@@ -125,6 +127,8 @@ async def dashboard(request: Request, db: mysql.connector.connection.MySQLConnec
                 'url_with_sas': pdf_url_with_sas,
                 'sas_token': row['sas_token'],
                 'uploaded_on': row['uploaded_on'],
+                'num_slides': row['num_slides'],
+                'file_size_kb': row['file_size_kb'],
                 'sets': []
             }
             presentation_dict[pdf_id] = presentation

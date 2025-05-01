@@ -230,7 +230,8 @@ def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db):
         # Clean up
         pdf_document.close()
 
-        return "Images and thumbnails converted and uploaded successfully!"
+        # Return the total number of pages
+        return total_pages
 
     except Exception as e:
         # If anything goes wrong, undo any partial database changes
