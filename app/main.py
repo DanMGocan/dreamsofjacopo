@@ -59,8 +59,8 @@ app.include_router(feedback.feedback) # Include the feedback router
 # Initialize templates
 templates = Jinja2Templates(directory="templates")
 
-# Admin email for access control
-ADMIN_EMAIL = "admin@slidepull.net"
+# Admin emails for access control
+ADMIN_EMAILS = ["admin@slidepull.net", "colm@tud.ie"]
 
 # Progress tracking is now handled client-side with a simple animation
 
@@ -339,7 +339,7 @@ async def admin_dashboard(request: Request):
         return RedirectResponse(url="/login")
     
     # Check if the user has admin access
-    if request.session['email'] != ADMIN_EMAIL:
+    if request.session['email'] not in ADMIN_EMAILS:
         # Redirect non-admin users to the regular dashboard
         return RedirectResponse(url="/dashboard")
     
@@ -423,7 +423,7 @@ async def dashboard(request: Request, db: mysql.connector.connection.MySQLConnec
     cursor.close()
 
     # Check if the user is an admin and add admin link if they are
-    is_admin = email == ADMIN_EMAIL
+    is_admin = email in ADMIN_EMAILS
 
     # Render the dashboard template with all the user and presentation data
     return templates.TemplateResponse("dashboard.html", {

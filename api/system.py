@@ -15,12 +15,12 @@ logger = logging.getLogger(__name__)
 # Create our API router
 system = APIRouter()
 
-# Admin email for access control
-ADMIN_EMAIL = "admin@slidepull.net"
+# Admin emails for access control
+ADMIN_EMAILS = ["admin@slidepull.net", "colm@tud.ie"]
 
 def check_admin_access(request: Request):
     """Check if the current user has admin access"""
-    if 'email' not in request.session or request.session['email'] != ADMIN_EMAIL:
+    if 'email' not in request.session or request.session['email'] not in ADMIN_EMAILS:
         raise HTTPException(status_code=403, detail="Admin access required")
     return True
 
@@ -37,7 +37,7 @@ async def get_stats(request: Request):
         if 'email' not in request.session:
             raise HTTPException(status_code=401, detail="Not authenticated")
         
-        if request.session['email'] != ADMIN_EMAIL:
+        if request.session['email'] not in ADMIN_EMAILS:
             raise HTTPException(status_code=403, detail="Admin access required")
         
         # Get the system stats
