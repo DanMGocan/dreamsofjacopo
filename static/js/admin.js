@@ -1,3 +1,83 @@
+// Global function to update bug report status
+function updateBugStatus(reportId, newStatus) {
+    if (confirm(`Are you sure you want to update the status of bug report #${reportId}?`)) {
+        fetch(`/api/system/bug-reports/${reportId}/status`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ status: newStatus })
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            alert(data.message);
+            // Refresh the bug reports table
+            document.getElementById('refreshBugReports').click();
+        })
+        .catch(error => {
+            console.error('Error updating bug status:', error);
+            alert('Failed to update bug status');
+        });
+    }
+}
+
+// Global function to show full bug description in a modal
+function showFullDescription(description) {
+    // Create modal elements
+    const modalBackdrop = document.createElement('div');
+    modalBackdrop.className = 'modal-backdrop fade show';
+    document.body.appendChild(modalBackdrop);
+    
+    const modalHtml = `
+        <div class="modal fade show" style="display: block;" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Bug Description</h5>
+                        <button type="button" class="btn-close" onclick="closeModal()"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p style="white-space: pre-wrap;">${description}</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" onclick="closeModal()">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    const modalContainer = document.createElement('div');
+    modalContainer.id = 'descriptionModal';
+    modalContainer.innerHTML = modalHtml;
+    document.body.appendChild(modalContainer);
+    
+    // Prevent scrolling of the background
+    document.body.style.overflow = 'hidden';
+}
+
+// Global function to close the modal
+function closeModal() {
+    // Remove modal elements
+    const modal = document.getElementById('descriptionModal');
+    if (modal) {
+        modal.remove();
+    }
+    
+    const backdrop = document.querySelector('.modal-backdrop');
+    if (backdrop) {
+        backdrop.remove();
+    }
+    
+    // Re-enable scrolling
+    document.body.style.overflow = '';
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize gauges
     const cpuGauge = createGauge('cpuGauge', 'CPU Usage');
@@ -7,11 +87,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // Fetch system stats initially
     fetchSystemStats();
     
+    // Fetch bug reports initially
+    fetchBugReports();
+    
     // Set up auto-refresh every 15 seconds
     const refreshInterval = setInterval(fetchSystemStats, 15000);
     
-    // Manual refresh button
+    // Manual refresh buttons
     document.getElementById('refreshSystemStats').addEventListener('click', fetchSystemStats);
+    document.getElementById('refreshBugReports').addEventListener('click', fetchBugReports);
     
     // System action buttons
     document.getElementById('killLibreOfficeBtn').addEventListener('click', function() {
@@ -82,6 +166,91 @@ document.addEventListener('DOMContentLoaded', function() {
     // Format uptime
     function formatUptime(days, hours, minutes) {
         return `${days}d ${hours}h ${minutes}m`;
+    }
+    
+    // Status labels and colors for bug reports
+    const statusLabels = {
+        0: { text: 'Pending', class: 'bg-secondary' },
+        1: { text: 'Investigating', class: 'bg-warning' },
+        2: { text: 'Resolved', class: 'bg-success' },
+        3: { text: 'Not a Bug', class: 'bg-info' }
+    };
+    
+    // Fetch bug reports from API
+    function fetchBugReports() {
+        fetch('/api/system/bug-reports')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                const bugReportsTable = document.getElementById('bugReportsTable');
+                bugReportsTable.innerHTML = '';
+                
+                if (data.bug_reports && data.bug_reports.length > 0) {
+                    data.bug_reports.forEach(report => {
+                        const row = document.createElement('tr');
+                        
+                        // Format the created date
+                        const createdDate = new Date(report.created_at);
+                        const formattedDate = createdDate.toLocaleDateString() + ' ' + createdDate.toLocaleTimeString();
+                        
+                        // Create status badge
+                        const statusInfo = statusLabels[report.status] || { text: 'Unknown', class: 'bg-secondary' };
+                        const statusBadge = `<span class="badge ${statusInfo.class}">${statusInfo.text}</span>`;
+                        
+                        // Create action buttons for status changes
+                        let actionButtons = '';
+                        Object.entries(statusLabels).forEach(([statusValue, statusInfo]) => {
+                            if (parseInt(statusValue) !== report.status) {
+                                actionButtons += `
+                                    <button class="btn btn-sm btn-outline-primary mb-1 me-1" 
+                                            onclick="updateBugStatus(${report.report_id}, ${statusValue})">
+                                        Mark as ${statusInfo.text}
+                                    </button>
+                                `;
+                            }
+                        });
+                        
+                        // Truncate long descriptions for display
+                        let displayDescription = report.bug_description;
+                        if (displayDescription.length > 100) {
+                            displayDescription = displayDescription.substring(0, 100) + '...';
+                        }
+                        
+                        // Create the row HTML
+                        row.innerHTML = `
+                            <td>${report.report_id}</td>
+                            <td>
+                                <div>${displayDescription}</div>
+                                <button class="btn btn-sm btn-link p-0" 
+                                        onclick="showFullDescription('${report.bug_description.replace(/'/g, "\\'")}')">
+                                    View Full
+                                </button>
+                            </td>
+                            <td>${report.email}</td>
+                            <td>${formattedDate}</td>
+                            <td>${statusBadge}</td>
+                            <td>
+                                <div class="d-flex flex-wrap">
+                                    ${actionButtons}
+                                </div>
+                            </td>
+                        `;
+                        
+                        bugReportsTable.appendChild(row);
+                    });
+                } else {
+                    bugReportsTable.innerHTML = '<tr><td colspan="6" class="text-center">No bug reports found</td></tr>';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching bug reports:', error);
+                document.getElementById('bugReportsTable').innerHTML = 
+                    '<tr><td colspan="6" class="text-center text-danger">Error fetching bug reports</td></tr>';
+            });
     }
     
     // Fetch system stats from API

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request, Depends, HTTPException
+from fastapi import APIRouter, Request, Depends, HTTPException, Path, Body
 from helpers.system_monitor import get_system_stats
 from database_op.database import get_db
 import mysql.connector
@@ -6,6 +6,8 @@ import logging
 import subprocess
 import os
 import sys
+from typing import Dict, Any
+from datetime import datetime
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -45,6 +47,92 @@ async def get_stats(request: Request):
     except Exception as e:
         logger.error(f"Error getting system stats: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting system stats: {str(e)}")
+
+@system.get("/bug-reports")
+async def get_bug_reports(request: Request, db: mysql.connector.connection.MySQLConnection = Depends(get_db)):
+    """
+    Get all bug reports with user information.
+    
+    This endpoint retrieves all bug reports from the database along with the email
+    of the user who submitted each report.
+    """
+    try:
+        # Check admin access
+        check_admin_access(request)
+        
+        # Get all bug reports with user email
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT br.report_id, br.bug_description, br.status, 
+                   br.created_at, br.updated_at, u.email
+            FROM bug_reports br
+            JOIN user u ON br.user_id = u.user_id
+            ORDER BY br.created_at DESC
+        """)
+        
+        bug_reports = cursor.fetchall()
+        cursor.close()
+        
+        # Convert datetime objects to strings for JSON serialization
+        for report in bug_reports:
+            report['created_at'] = report['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+            report['updated_at'] = report['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
+        
+        return {"bug_reports": bug_reports}
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 403 Forbidden)
+        raise
+    except Exception as e:
+        logger.error(f"Error getting bug reports: {e}")
+        raise HTTPException(status_code=500, detail=f"Error getting bug reports: {str(e)}")
+
+@system.post("/bug-reports/{report_id}/status")
+async def update_bug_report_status(
+    request: Request,
+    report_id: int = Path(...),
+    status_data: Dict[str, Any] = Body(...),
+    db: mysql.connector.connection.MySQLConnection = Depends(get_db)
+):
+    """
+    Update the status of a bug report.
+    
+    This endpoint allows changing the status of a bug report to one of:
+    - 0: pending
+    - 1: investigating
+    - 2: resolved
+    - 3: not_a_bug
+    """
+    try:
+        # Check admin access
+        check_admin_access(request)
+        
+        # Get the new status from the request body
+        new_status = status_data.get("status")
+        if new_status is None or not isinstance(new_status, int) or new_status < 0 or new_status > 3:
+            raise HTTPException(status_code=400, detail="Invalid status value. Must be 0, 1, 2, or 3.")
+        
+        # Update the bug report status
+        cursor = db.cursor()
+        cursor.execute(
+            "UPDATE bug_reports SET status = %s, updated_at = %s WHERE report_id = %s",
+            (new_status, datetime.now(), report_id)
+        )
+        db.commit()
+        
+        # Check if any rows were affected
+        if cursor.rowcount == 0:
+            cursor.close()
+            raise HTTPException(status_code=404, detail=f"Bug report with ID {report_id} not found")
+        
+        cursor.close()
+        
+        return {"message": f"Bug report status updated successfully", "report_id": report_id, "new_status": new_status}
+    except HTTPException:
+        # Re-raise HTTP exceptions (like 403 Forbidden)
+        raise
+    except Exception as e:
+        logger.error(f"Error updating bug report status: {e}")
+        raise HTTPException(status_code=500, detail=f"Error updating bug report status: {str(e)}")
 
 @system.post("/kill-libreoffice")
 async def kill_libreoffice(request: Request):
