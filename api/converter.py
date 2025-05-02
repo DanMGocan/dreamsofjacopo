@@ -185,7 +185,8 @@ async def upload_pptx(
         conversion_progress[upload_id]["status"] = "converting_to_pdf"
 
         # Step 1: Convert PowerPoint to PDF
-        pdf_bytes = convert_pptx_bytes_to_pdf(pptx_bytes, request)
+        # Now properly awaiting the asynchronous conversion
+        pdf_bytes = await convert_pptx_bytes_to_pdf(pptx_bytes, request)
 
         # Set up the path where we'll store the PDF in Azure
         pdf_blob_name = f"{user_alias}/pdf/{sanitized_filename}"
@@ -257,7 +258,8 @@ async def upload_pptx(
         # Step 2: Convert the PDF to images and thumbnails
         # This function will update the progress in the conversion_progress dictionary
         # It now also returns the number of slides
-        num_slides = convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db)
+        # Now properly awaiting the asynchronous conversion
+        num_slides = await convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db)
 
         # Update the number of slides in the database record
         try:
@@ -538,7 +540,7 @@ import logging
 # Progress tracking is now handled client-side with a simple animation
 
 @converter.post("/generate-set/{pdf_id}", response_class=HTMLResponse)
-def generate_set(
+async def generate_set(
     pdf_id: int,
     request: Request,
     selected_thumbnails: Optional[List[str]] = Form(None),
@@ -691,10 +693,12 @@ def generate_set(
                 # Get the full URL with security token
                 image_url = f"{image['url']}?{image['sas_token']}"
                 
-                # Download the image from Azure
-                blob_client = BlobClient.from_blob_url(image_url)
-                downloader = blob_client.download_blob(timeout=30)
-                blob_data = downloader.readall()
+                # Download the image from Azure asynchronously
+                import aiohttp
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(image_url) as response:
+                        response.raise_for_status()
+                        blob_data = await response.read()
 
                 # Create a temporary image file in memory
                 img_stream = io.BytesIO(blob_data)

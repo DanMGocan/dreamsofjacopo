@@ -5,6 +5,8 @@ import subprocess
 import requests
 import logging
 import time
+import asyncio
+import uuid
 from azure.storage.blob import BlobServiceClient
 from fastapi import HTTPException, Request, Depends
 import tempfile
@@ -13,6 +15,7 @@ import mysql.connector
 from datetime import datetime, timedelta
 from helpers.blob_op import generate_sas_token_for_file
 from helpers.blob_op import upload_to_blob
+from concurrent.futures import ThreadPoolExecutor
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -23,13 +26,24 @@ logger = logging.getLogger(__name__)
 AZURE_STORAGE_ACCOUNT_NAME = os.getenv("AZURE_STORAGE_ACCOUNT_NAME")
 AZURE_BLOB_CONTAINER_NAME = "slide-pull-main"
 
-def convert_pptx_bytes_to_pdf(pptx_bytes, request: Request):
+# Create a thread pool for running LibreOffice conversions
+# This limits the number of concurrent LibreOffice processes
+# to prevent resource exhaustion
+libreoffice_pool = ThreadPoolExecutor(max_workers=2)
+
+# Create a thread pool for image processing and uploads
+# This allows multiple images to be processed concurrently
+image_pool = ThreadPoolExecutor(max_workers=4)
+
+async def convert_pptx_bytes_to_pdf(pptx_bytes, request: Request):
     """
     Takes a PowerPoint file in memory and converts it to PDF using LibreOffice.
     
     This is the first step in our conversion pipeline. We take the uploaded .pptx,
     save it temporarily to disk (since LibreOffice needs a file path), convert it,
     and then read the PDF back into memory.
+    
+    This function is now truly asynchronous and won't block other requests.
     
     Note: Only .pptx format is fully supported. Other formats like .odt are not
     currently supported.
@@ -38,11 +52,17 @@ def convert_pptx_bytes_to_pdf(pptx_bytes, request: Request):
         # Create a buffer for our PowerPoint file
         pptx_in_memory = io.BytesIO(pptx_bytes)
 
+        # Create a unique ID for this conversion to avoid conflicts
+        conversion_id = str(uuid.uuid4())
+        
         # We need to use a temp directory since LibreOffice works with files on disk
-        with tempfile.TemporaryDirectory() as temp_dir:
-            # Set up our temporary file paths
-            temp_pptx_path = os.path.join(temp_dir, "temp_presentation.pptx")
-            temp_pdf_path = os.path.join(temp_dir, "temp_presentation.pdf")
+        # Each conversion gets its own unique temp directory
+        temp_dir = tempfile.mkdtemp(prefix=f"conversion_{conversion_id}_")
+        
+        try:
+            # Set up our temporary file paths with unique names
+            temp_pptx_path = os.path.join(temp_dir, f"{conversion_id}.pptx")
+            temp_pdf_path = os.path.join(temp_dir, f"{conversion_id}.pdf")
 
             # Save the PowerPoint to disk temporarily
             with open(temp_pptx_path, "wb") as f:
@@ -62,38 +82,78 @@ def convert_pptx_bytes_to_pdf(pptx_bytes, request: Request):
             # Cap the timeout at a reasonable maximum (10 minutes)
             timeout = min(estimated_timeout, 600)
             
-            logger.info(f"Converting PPTX to PDF (size: {pptx_size_mb:.2f} MB, timeout: {timeout:.0f} seconds)")
+            logger.info(f"Converting PPTX to PDF (ID: {conversion_id}, size: {pptx_size_mb:.2f} MB, timeout: {timeout:.0f} seconds)")
 
             # Run LibreOffice in headless mode to do the conversion
             # This is way faster than using COM automation or other methods
             try:
-                # First, make sure no existing LibreOffice processes are hanging around
-                # This helps prevent conflicts on low-resource systems
-                try:
-                    if os.name == 'posix':  # Linux/Unix
-                        subprocess.run(['pkill', 'soffice'], stderr=subprocess.DEVNULL)
-                        time.sleep(1)  # Give it a moment to clean up
-                except Exception:
-                    pass  # Ignore errors from pkill
+                # Use a unique user profile for each conversion to avoid conflicts
+                user_profile_dir = os.path.join(temp_dir, "userprofile")
+                os.makedirs(user_profile_dir, exist_ok=True)
                 
-                # Run the conversion with the calculated timeout
-                subprocess.run([soffice_path, '--headless', '--convert-to', 'pdf', 
-                               temp_pptx_path, '--outdir', temp_dir], 
-                               check=True, timeout=timeout)
-            except subprocess.TimeoutExpired:
-                logger.error(f"LibreOffice conversion timed out after {timeout} seconds")
-                raise Exception(f"The presentation took too long to convert. This may be due to its size or complexity. Please try a smaller or simpler presentation, or try again later when the server is less busy.")
+                # Prepare the command
+                cmd = [
+                    soffice_path, 
+                    '--headless', 
+                    '--convert-to', 'pdf', 
+                    temp_pptx_path, 
+                    '--outdir', temp_dir,
+                    '-env:UserInstallation=file://' + user_profile_dir.replace('\\', '/')
+                ]
+                
+                # Run the conversion asynchronously using the thread pool
+                # This prevents blocking the event loop while LibreOffice runs
+                def run_libreoffice():
+                    process = subprocess.Popen(
+                        cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE
+                    )
+                    try:
+                        stdout, stderr = process.communicate(timeout=timeout)
+                        if process.returncode != 0:
+                            logger.error(f"LibreOffice conversion failed with code {process.returncode}: {stderr.decode()}")
+                            raise Exception(f"LibreOffice conversion failed with code {process.returncode}")
+                        return True
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        logger.error(f"LibreOffice conversion timed out after {timeout} seconds")
+                        raise Exception(f"The presentation took too long to convert. This may be due to its size or complexity.")
+                
+                # Run the conversion in the thread pool and await its completion
+                await asyncio.get_event_loop().run_in_executor(
+                    libreoffice_pool, 
+                    run_libreoffice
+                )
+                
+            except Exception as e:
+                logger.error(f"Error during LibreOffice conversion: {str(e)}")
+                raise e
 
             # Check if the PDF was actually created
-            if not os.path.exists(temp_pdf_path):
+            # The output filename might be different from what we expect
+            pdf_files = [f for f in os.listdir(temp_dir) if f.endswith('.pdf')]
+            if not pdf_files:
                 logger.error("PDF file was not created by LibreOffice")
                 raise Exception("Failed to convert PPTX to PDF: Output file was not created")
+            
+            # Use the first PDF file found
+            temp_pdf_path = os.path.join(temp_dir, pdf_files[0])
 
             # Read the converted PDF back into memory
             with open(temp_pdf_path, "rb") as pdf_file:
                 pdf_data = pdf_file.read()
 
             return pdf_data
+
+        finally:
+            # Clean up the temporary directory and all its contents
+            # This is important to prevent disk space issues
+            try:
+                import shutil
+                shutil.rmtree(temp_dir, ignore_errors=True)
+            except Exception as cleanup_error:
+                logger.warning(f"Failed to clean up temporary directory: {cleanup_error}")
 
     except subprocess.CalledProcessError as e:
         # This happens if LibreOffice fails to convert the file
@@ -107,7 +167,7 @@ def convert_pptx_bytes_to_pdf(pptx_bytes, request: Request):
 # Dictionary to track conversion progress
 conversion_progress = {}
 
-def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db):
+async def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db):
     """
     Takes a PDF stored in Azure Blob Storage and converts each page to images and thumbnails.
     
@@ -120,6 +180,8 @@ def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db):
     The thumbnails are what users will see when selecting slides to include in a set.
     
     Progress is tracked and can be accessed via the conversion_progress dictionary.
+    
+    This function is now asynchronous and won't block other requests.
     """
     # Set up image quality - we use 2x scaling for high-res images
     # This makes text crisp and readable even when zoomed in
@@ -150,10 +212,13 @@ def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db):
         logger.info(f"Downloading PDF from Azure: {pdf_blob_url}")
         conversion_progress[str_pdf_id]["status"] = "downloading_pdf"
 
-        # Download the PDF file
-        response = requests.get(pdf_blob_url_with_sas)
-        response.raise_for_status()  # Will raise an exception for HTTP errors
-        pdf_bytes = response.content
+        # Download the PDF file asynchronously
+        import aiohttp
+        async with aiohttp.ClientSession() as session:
+            async with session.get(pdf_blob_url_with_sas) as response:
+                response.raise_for_status()  # Will raise an exception for HTTP errors
+                pdf_bytes = await response.read()
+                
         if not pdf_bytes:
             conversion_progress[str_pdf_id]["status"] = "error"
             raise Exception("Downloaded PDF is empty - check the source file")
@@ -185,9 +250,11 @@ def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db):
             # Name the image file based on slide number
             image_blob_name = f"{image_blob_base}{page_number + 1}.png"
             
-            # Upload the full-size image to Azure
-            image_url, sas_token_image, sas_token_expiry = upload_to_blob(
-                image_blob_name, image_bytes, "image/png", user_alias
+            # Upload the full-size image to Azure asynchronously
+            # We'll use a thread pool for this since upload_to_blob is not async
+            image_url, sas_token_image, sas_token_expiry = await asyncio.get_event_loop().run_in_executor(
+                image_pool,
+                lambda: upload_to_blob(image_blob_name, image_bytes, "image/png", user_alias)
             )
             
             # Save the image info to our database
@@ -206,10 +273,11 @@ def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db):
             thumbnail_pix = page.get_pixmap(matrix=thumbnail_matrix)
             thumbnail_bytes = thumbnail_pix.tobytes("png")
             
-            # Name and upload the thumbnail
+            # Name and upload the thumbnail asynchronously
             thumbnail_blob_name = f"{thumbnail_blob_base}{page_number + 1}.png"
-            thumbnail_url, sas_token_thumbnail, sas_token_thumbnail_expiry = upload_to_blob(
-                thumbnail_blob_name, thumbnail_bytes, "image/png", user_alias
+            thumbnail_url, sas_token_thumbnail, sas_token_thumbnail_expiry = await asyncio.get_event_loop().run_in_executor(
+                image_pool,
+                lambda: upload_to_blob(thumbnail_blob_name, thumbnail_bytes, "image/png", user_alias)
             )
             
             # Save the thumbnail info to our database
