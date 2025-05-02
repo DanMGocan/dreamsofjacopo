@@ -53,37 +53,12 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
-    // Special handling for the "Get Started" button to scroll to login section after showing modal
-    const getStartedButton = document.querySelector('[data-feature="get-started"]');
-    if (getStartedButton) {
-        getStartedButton.addEventListener('click', function(e) {
+    // Smooth scroll to features section when clicking on any anchor with href="#features"
+    const featureLinks = document.querySelectorAll('a[href="#features"]');
+    featureLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
             e.preventDefault();
-
-            // Show the modal
-            const modal = new bootstrap.Modal(document.getElementById('notImplementedModal'));
-            modal.show();
-
-            // After modal is hidden, scroll to login section
-            document.getElementById('notImplementedModal').addEventListener('hidden.bs.modal', function () {
-                document.getElementById('login').scrollIntoView({ behavior: 'smooth' });
-            }, { once: true });
+            document.getElementById('features').scrollIntoView({ behavior: 'smooth' });
         });
-    }
-
-    // Special handling for the "Learn More" button to scroll to features section after showing modal
-    const learnMoreButton = document.querySelector('[data-feature="learn-more"]');
-    if (learnMoreButton) {
-        learnMoreButton.addEventListener('click', function(e) {
-            e.preventDefault();
-
-            // Show the modal
-            const modal = new bootstrap.Modal(document.getElementById('notImplementedModal'));
-            modal.show();
-
-            // After modal is hidden, scroll to features section
-            document.getElementById('notImplementedModal').addEventListener('hidden.bs.modal', function () {
-                document.getElementById('features').scrollIntoView({ behavior: 'smooth' });
-            }, { once: true });
-        });
-    }
+    });
 });
