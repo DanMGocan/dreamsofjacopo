@@ -3,33 +3,34 @@
 {% block title %}How it works? | SlidePull{% endblock %}
 
 {% block content %}
-<div class="card">
+<div class="card card-navy-shadow">
     <div class="card-header bg-white">
         <h1 class="section-title h3 mb-0">
-            <i class="fas fa-question-circle me-2"></i> How SlidePull Works
+            <i class="fas fa-question-circle me-2" style="color: var(--primary-color);"></i> How SlidePull Works
         </h1>
     </div>
     <div class="card-body">
         <div class="row mb-5">
             <div class="col-lg-12">
-                <p class="lead">SlidePull makes it easy to share specific slides from your presentations with your audience.</p>
-                <p>Whether you're a presenter, educator, or business professional, our platform helps you create QR codes that link directly to the slides you want to share.</p>
+                <p class="lead">SlidePull converts your PowerPoint presentations into shareable slides with QR codes.</p>
+                <p>Our platform is designed for educators, presenters, and professionals who need to share specific slides with their audience quickly and securely.</p>
             </div>
         </div>
 
-        <div class="row mb-5">
+        <!-- Process Steps -->
+        <div class="row mb-5 pt-3">
             <div class="col-md-4 text-center mb-4 mb-md-0">
-                <div class="bg-light-gray p-4 rounded-3 h-100">
-                    <div class="display-4 text-primary mb-3">
+                <div class="bg-light-gray p-4 rounded-3 h-100 card-navy-shadow">
+                    <div class="display-4 mb-3" style="color: var(--primary-color);">
                         <i class="fas fa-upload"></i>
                     </div>
                     <h3 class="h4">1. Upload</h3>
-                    <p>Upload your PowerPoint presentation to your account. We'll convert it to a PDF format that's easy to view on any device.</p>
+                    <p>Upload your PowerPoint presentation to your account. We'll convert it to a PDF format that's viewable on any device.</p>
                 </div>
             </div>
             <div class="col-md-4 text-center mb-4 mb-md-0">
-                <div class="bg-light-gray p-4 rounded-3 h-100">
-                    <div class="display-4 text-primary mb-3">
+                <div class="bg-light-gray p-4 rounded-3 h-100 card-navy-shadow">
+                    <div class="display-4 mb-3" style="color: var(--primary-color);">
                         <i class="fas fa-mouse-pointer"></i>
                     </div>
                     <h3 class="h4">2. Select</h3>
@@ -37,8 +38,8 @@
                 </div>
             </div>
             <div class="col-md-4 text-center">
-                <div class="bg-light-gray p-4 rounded-3 h-100">
-                    <div class="display-4 text-primary mb-3">
+                <div class="bg-light-gray p-4 rounded-3 h-100 card-navy-shadow">
+                    <div class="display-4 mb-3" style="color: var(--primary-color);">
                         <i class="fas fa-qrcode"></i>
                     </div>
                     <h3 class="h4">3. Share</h3>
@@ -47,51 +48,52 @@
             </div>
         </div>
 
-        <div class="row mb-5">
+        <!-- Technology & Security -->
+        <div class="row mb-5 pt-5">
             <div class="col-lg-12">
-                <h2 class="h4 mb-4">Key Features</h2>
+                <h2 class="h4 mb-4">Technology & Security</h2>
                 <div class="row">
-                    <div class="col-md-6 mb-4">
+                    <div class="col-md-6 mb-5">
                         <div class="d-flex">
                             <div class="flex-shrink-0">
-                                <i class="fas fa-check-circle text-primary fa-2x me-3"></i>
+                                <i class="fas fa-server fa-2x me-3" style="color: var(--primary-color);"></i>
                             </div>
                             <div>
-                                <h3 class="h5">Presentation Slots</h3>
-                                <p>Upload your presentations to dedicated slots in your account. Free users get 1 slot, while premium users get unlimited slots.</p>
+                                <h3 class="h5">Azure Cloud Infrastructure</h3>
+                                <p>All SlidePull operations run on secure Azure Virtual Machines. Your presentations and generated QR codes are stored on Azure Servers with enterprise-grade security.</p>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-6 mb-4">
+                    <div class="col-md-6 mb-5">
                         <div class="d-flex">
                             <div class="flex-shrink-0">
-                                <i class="fas fa-check-circle text-primary fa-2x me-3"></i>
+                                <i class="fas fa-memory fa-2x me-3" style="color: var(--primary-color);"></i>
                             </div>
                             <div>
-                                <h3 class="h5">Slide Selection</h3>
-                                <p>Choose exactly which slides you want to include in each set. You can create multiple sets from a single presentation.</p>
+                                <h3 class="h5">In-Memory Conversion</h3>
+                                <p>Your presentations are processed in-memory, ensuring that your content is never written to disk during conversion, enhancing security and privacy.</p>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-6 mb-4">
+                    <div class="col-md-6 mb-5">
                         <div class="d-flex">
                             <div class="flex-shrink-0">
-                                <i class="fas fa-check-circle text-primary fa-2x me-3"></i>
+                                <i class="fas fa-clock fa-2x me-3" style="color: var(--primary-color);"></i>
                             </div>
                             <div>
-                                <h3 class="h5">QR Code Generation</h3>
-                                <p>Generate QR codes for each slide set. Your audience can scan these codes to view your slides on any device.</p>
+                                <h3 class="h5">File Retention Policy</h3>
+                                <p>Files that haven't been accessed or downloaded in 60 days are automatically deleted to maintain system efficiency and ensure your storage allocation is used effectively.</p>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-6 mb-4">
+                    <div class="col-md-6 mb-5">
                         <div class="d-flex">
                             <div class="flex-shrink-0">
-                                <i class="fas fa-check-circle text-primary fa-2x me-3"></i>
+                                <i class="fas fa-chart-line fa-2x me-3" style="color: var(--primary-color);"></i>
                             </div>
                             <div>
-                                <h3 class="h5">Mobile-Friendly Viewing</h3>
-                                <p>Your slides are optimized for viewing on any device, including smartphones and tablets.</p>
+                                <h3 class="h5">Usage Analytics</h3>
+                                <p>All users have access to download analytics, allowing you to track how many times your presentations and slide sets have been accessed.</p>
                             </div>
                         </div>
                     </div>
@@ -99,7 +101,8 @@
             </div>
         </div>
 
-        <div class="row">
+        <!-- Account Tiers -->
+        <div class="row pt-5">
             <div class="col-lg-12">
                 <h2 class="h4 mb-4">Account Tiers</h2>
                 <div class="table-responsive">
@@ -108,37 +111,62 @@
                             <tr>
                                 <th>Feature</th>
                                 <th>Free</th>
-                                <th>Premium</th>
+                                <th>Premium (€5.99/month)</th>
+                                <th>Corporate (€11.99/month)</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
                                 <td>Presentation Slots</td>
                                 <td>1</td>
-                                <td>Unlimited</td>
-                            </tr>
-                            <tr>
-                                <td>Storage Duration</td>
-                                <td>3 days</td>
-                                <td>Unlimited</td>
+                                <td>3</td>
+                                <td>6</td>
                             </tr>
                             <tr>
                                 <td>Maximum Slides per Presentation</td>
-                                <td>20</td>
-                                <td>Unlimited</td>
+                                <td>50</td>
+                                <td>75</td>
+                                <td>100</td>
+                            </tr>
+                            <tr>
+                                <td>Maximum File Size</td>
+                                <td>20 MB</td>
+                                <td>30 MB</td>
+                                <td>50 MB</td>
                             </tr>
                             <tr>
                                 <td>Sets per Presentation</td>
-                                <td>1</td>
-                                <td>Unlimited</td>
+                                <td>2</td>
+                                <td>5</td>
+                                <td>8</td>
+                            </tr>
+                            <tr>
+                                <td>File Retention</td>
+                                <td>60 days</td>
+                                <td>60 days</td>
+                                <td>60 days</td>
+                            </tr>
+                            <tr>
+                                <td>Usage Analytics</td>
+                                <td><i class="fas fa-check" style="color: var(--primary-color);"></i></td>
+                                <td><i class="fas fa-check" style="color: var(--primary-color);"></i></td>
+                                <td><i class="fas fa-check" style="color: var(--primary-color);"></i></td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
-                <div class="text-center mt-4">
+                
+                <div class="text-center mt-5 pt-3">
                     <a href="/upgrade" class="btn btn-primary btn-lg">
-                        <i class="fas fa-crown me-2"></i> Upgrade to Premium
+                        <i class="fas fa-crown me-2"></i> Upgrade Your Account
                     </a>
+                </div>
+                
+                <div class="alert alert-light mt-5 pt-3">
+                    <div class="d-flex align-items-center">
+                        <i class="fas fa-envelope fa-2x me-3" style="color: var(--primary-color);"></i>
+                        <p class="mb-0">For questions, concerns or for a chat, please email us at <a href="mailto:admin@slidepull.net">admin@slidepull.net</a></p>
+                    </div>
                 </div>
             </div>
         </div>

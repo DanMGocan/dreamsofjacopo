@@ -43,7 +43,9 @@ oauth.register(
     client_secret=config('GOOGLE_CLIENT_SECRET'),
     server_metadata_url='https://accounts.google.com/.well-known/openid-configuration',
     client_kwargs={
-        'scope': 'openid email',
+        'scope': 'openid email profile',
+        'prompt': 'select_account',
+        'access_type': 'offline'
     }
 )
 
@@ -143,20 +145,38 @@ async def login(
 # Google Login Endpoint
 @users.get("/login/google")
 async def login_via_google(request: Request):
-    redirect_uri = config("GOOGLE_REDIRECT_URI")
-    return await oauth.google.authorize_redirect(request, redirect_uri)
+    try:
+        redirect_uri = config("GOOGLE_REDIRECT_URI")
+        print(f"Google login redirect URI: {redirect_uri}")  # Debug print
+        return await oauth.google.authorize_redirect(request, redirect_uri)
+    except Exception as e:
+        print(f"Error in Google login: {str(e)}")  # Debug print
+        raise HTTPException(status_code=500, detail=f"Google OAuth error: {str(e)}")
 
 @users.get("/auth/google/callback")
 async def google_auth_callback(
     request: Request,
     db: mysql.connector.connection.MySQLConnection = Depends(get_db)
 ):
-    # Fetch the token from the authorization callback
-    token = await oauth.google.authorize_access_token(request)
-    userinfo = token.get('userinfo')
+    try:
+        # Fetch the token from the authorization callback
+        token = await oauth.google.authorize_access_token(request)
+        userinfo = token.get('userinfo')
+        
+        if not userinfo:
+            print("No userinfo in token response")
+            raise HTTPException(status_code=400, detail="Failed to get user info from Google")
 
-    # Extract the user's email from the userinfo
-    email = userinfo.get('email')
+        # Extract the user's email from the userinfo
+        email = userinfo.get('email')
+        if not email:
+            print("No email in userinfo")
+            raise HTTPException(status_code=400, detail="Email not provided by Google")
+            
+        print(f"Successfully authenticated with Google: {email}")
+    except Exception as e:
+        print(f"Error in Google callback: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Google OAuth callback error: {str(e)}")
 
     # Open a database connection
     if db is None:
