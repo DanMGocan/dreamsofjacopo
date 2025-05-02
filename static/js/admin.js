@@ -392,44 +392,52 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('uptimeDisplay').textContent = formatUptime(days, hours, minutes);
                 document.getElementById('uptimeInfo').textContent = `System has been running since ${new Date(Date.now() - data.uptime.total_seconds * 1000).toLocaleString()}`;
                 
-                // Update top processes table
-                const topProcessesTable = document.getElementById('topProcessesTable');
-                topProcessesTable.innerHTML = '';
+                // Update top CPU processes table
+                const topCpuProcessesTable = document.getElementById('topCpuProcessesTable');
+                topCpuProcessesTable.innerHTML = '';
                 
                 if (data.top_processes && data.top_processes.length > 0) {
-                    data.top_processes.forEach(process => {
+                    // Sort processes by CPU usage (descending)
+                    const cpuSortedProcesses = [...data.top_processes].sort((a, b) => b.cpu_percent - a.cpu_percent);
+                    
+                    // Take top 10 processes
+                    const topCpuProcesses = cpuSortedProcesses.slice(0, 10);
+                    
+                    topCpuProcesses.forEach(process => {
                         const row = document.createElement('tr');
                         row.innerHTML = `
                             <td>${process.name}</td>
                             <td>${process.pid}</td>
                             <td>${process.cpu_percent.toFixed(1)}%</td>
-                            <td>${process.memory_percent.toFixed(1)}%</td>
                         `;
-                        topProcessesTable.appendChild(row);
+                        topCpuProcessesTable.appendChild(row);
                     });
                 } else {
-                    topProcessesTable.innerHTML = '<tr><td colspan="4" class="text-center">No significant processes found</td></tr>';
+                    topCpuProcessesTable.innerHTML = '<tr><td colspan="3" class="text-center">No significant processes found</td></tr>';
                 }
                 
-                // Update LibreOffice processes
-                const libreofficeProcessesDiv = document.getElementById('libreofficeProcesses');
-                if (data.libreoffice_processes && data.libreoffice_processes.length > 0) {
-                    let html = '<div class="table-responsive"><table class="table table-sm table-hover">';
-                    html += '<thead><tr><th>Process</th><th>PID</th><th>CPU %</th><th>Memory %</th></tr></thead><tbody>';
+                // Update top memory processes table
+                const topMemoryProcessesTable = document.getElementById('topMemoryProcessesTable');
+                topMemoryProcessesTable.innerHTML = '';
+                
+                if (data.top_processes && data.top_processes.length > 0) {
+                    // Sort processes by memory usage (descending)
+                    const memorySortedProcesses = [...data.top_processes].sort((a, b) => b.memory_percent - a.memory_percent);
                     
-                    data.libreoffice_processes.forEach(process => {
-                        html += `<tr>
+                    // Take top 10 processes
+                    const topMemoryProcesses = memorySortedProcesses.slice(0, 10);
+                    
+                    topMemoryProcesses.forEach(process => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
                             <td>${process.name}</td>
                             <td>${process.pid}</td>
-                            <td>${process.cpu_percent.toFixed(1)}%</td>
                             <td>${process.memory_percent.toFixed(1)}%</td>
-                        </tr>`;
+                        `;
+                        topMemoryProcessesTable.appendChild(row);
                     });
-                    
-                    html += '</tbody></table></div>';
-                    libreofficeProcessesDiv.innerHTML = html;
                 } else {
-                    libreofficeProcessesDiv.innerHTML = '<div class="alert alert-info">No LibreOffice processes currently running</div>';
+                    topMemoryProcessesTable.innerHTML = '<tr><td colspan="3" class="text-center">No significant processes found</td></tr>';
                 }
                 
                 // Update last updated time
@@ -442,8 +450,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     document.getElementById('cpuInfo').textContent = 'Error fetching data';
                     document.getElementById('memoryInfo').textContent = 'Error fetching data';
                     document.getElementById('diskInfo').textContent = 'Error fetching data';
-                    document.getElementById('topProcessesTable').innerHTML = '<tr><td colspan="4" class="text-center text-danger">Error fetching process data</td></tr>';
-                    document.getElementById('libreofficeProcesses').innerHTML = '<div class="alert alert-danger">Error fetching process data</div>';
+                    document.getElementById('topCpuProcessesTable').innerHTML = '<tr><td colspan="3" class="text-center text-danger">Error fetching process data</td></tr>';
+                    document.getElementById('topMemoryProcessesTable').innerHTML = '<tr><td colspan="3" class="text-center text-danger">Error fetching process data</td></tr>';
                 }
             });
     }

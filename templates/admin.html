@@ -94,7 +94,7 @@
                     <div class="col-md-6 mb-4">
                         <div class="card h-100 border-0 shadow-sm">
                             <div class="card-header bg-light-gray">
-                                <h3 class="h5 mb-0">Top Processes</h3>
+                                <h3 class="h5 mb-0">Top Processes by CPU</h3>
                             </div>
                             <div class="card-body">
                                 <div class="table-responsive">
@@ -104,12 +104,11 @@
                                                 <th>Process</th>
                                                 <th>PID</th>
                                                 <th>CPU %</th>
-                                                <th>Memory %</th>
                                             </tr>
                                         </thead>
-                                        <tbody id="topProcessesTable">
+                                        <tbody id="topCpuProcessesTable">
                                             <tr>
-                                                <td colspan="4" class="text-center">Loading process information...</td>
+                                                <td colspan="3" class="text-center">Loading process information...</td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -121,11 +120,24 @@
                     <div class="col-md-6 mb-4">
                         <div class="card h-100 border-0 shadow-sm">
                             <div class="card-header bg-light-gray">
-                                <h3 class="h5 mb-0">LibreOffice Processes</h3>
+                                <h3 class="h5 mb-0">Top Processes by RAM</h3>
                             </div>
                             <div class="card-body">
-                                <div id="libreofficeProcesses">
-                                    <p class="text-center">Checking for LibreOffice processes...</p>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover">
+                                        <thead>
+                                            <tr>
+                                                <th>Process</th>
+                                                <th>PID</th>
+                                                <th>Memory %</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="topMemoryProcessesTable">
+                                            <tr>
+                                                <td colspan="3" class="text-center">Loading process information...</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
                                 </div>
                             </div>
                         </div>
