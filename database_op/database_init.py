@@ -85,11 +85,18 @@ def initialize_database():
         connection.commit()
         print("Premium columns added successfully!")
 
-        # Now insert the test user
+        # Now insert the test users
         # Use the same password hashing as the application
-        test_email = 'admin@slidepull.net'
-        test_password = 'slidepull'  # Plain text password for the test account
-        hashed_password = bcrypt.hashpw(test_password.encode('utf-8'), bcrypt.gensalt())
+        
+        # Admin user (premium tier)
+        admin_email = 'admin@slidepull.net'
+        admin_password = 'slidepull'  # Plain text password for the admin account
+        admin_hashed_password = bcrypt.hashpw(admin_password.encode('utf-8'), bcrypt.gensalt())
+
+        # Corporate user
+        corporate_email = 'colm@tud.ie'
+        corporate_password = 'tu082'  # Plain text password for the corporate account
+        corporate_hashed_password = bcrypt.hashpw(corporate_password.encode('utf-8'), bcrypt.gensalt())
 
         # Prepare the insert statement
         insert_user_query = """
@@ -97,18 +104,29 @@ def initialize_database():
         VALUES (%s, %s, %s, %s, %s, %s)
         """
 
+        # Insert admin user
         cursor.execute(insert_user_query, (
-            test_email,
-            hashed_password.decode('utf-8'),  # Decode to convert bytes to string
+            admin_email,
+            admin_hashed_password.decode('utf-8'),  # Decode to convert bytes to string
             1,  # premium_status (1 for premium, 0 for free)
             True,  # account_activated (True means the account is activated)
             'slide_pull',  # login_method
             'testuser'  # alias (must be unique)
         ))
 
-        # Commit the test user insertion
+        # Insert corporate user
+        cursor.execute(insert_user_query, (
+            corporate_email,
+            corporate_hashed_password.decode('utf-8'),  # Decode to convert bytes to string
+            2,  # premium_status (2 for corporate)
+            True,  # account_activated (True means the account is activated)
+            'slide_pull',  # login_method
+            'colmtud'  # alias (must be unique)
+        ))
+
+        # Commit the user insertions
         connection.commit()
-        print("Test user inserted successfully!")
+        print("Test users inserted successfully!")
 
         cursor.close()
         connection.close()

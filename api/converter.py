@@ -111,6 +111,8 @@ async def upload_pptx(
                 db = get_connection()
             except Exception as e:
                 logger.error(f"Failed to get a new database connection: {e}")
+            # Make sure the key exists before trying to access it
+            if upload_id in conversion_progress:
                 conversion_progress[upload_id]["status"] = "error"
                 raise HTTPException(
                     status_code=500,
@@ -296,7 +298,8 @@ async def upload_pptx(
             logger.error(f"Error during rollback: {str(rollback_err)}")
         
         # Update progress with error
-        conversion_progress[upload_id]["status"] = "error"
+        if upload_id in conversion_progress:
+            conversion_progress[upload_id]["status"] = "error"
         
         # Return a more specific error message
         if isinstance(e, HTTPException):
