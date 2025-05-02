@@ -91,19 +91,30 @@ async def convert_pptx_bytes_to_pdf(pptx_bytes, request: Request):
                 user_profile_dir = os.path.join(temp_dir, "userprofile")
                 os.makedirs(user_profile_dir, exist_ok=True)
                 
+                # Normalize paths to avoid issues with backslashes in Windows
+                temp_dir_normalized = temp_dir.replace('\\', '/')
+                temp_pptx_path_normalized = temp_pptx_path.replace('\\', '/')
+                user_profile_dir_normalized = user_profile_dir.replace('\\', '/')
+                
                 # Prepare the command
                 cmd = [
                     soffice_path, 
                     '--headless', 
                     '--convert-to', 'pdf', 
-                    temp_pptx_path, 
-                    '--outdir', temp_dir,
-                    '-env:UserInstallation=file://' + user_profile_dir.replace('\\', '/')
+                    temp_pptx_path_normalized, 
+                    '--outdir', temp_dir_normalized
                 ]
+                
+                # Only add user profile on Windows to avoid issues
+                if os.name == 'nt':  # Windows
+                    cmd.append('-env:UserInstallation=file:///' + user_profile_dir_normalized)
+                else:  # Linux/Mac
+                    cmd.append('-env:UserInstallation=file://' + user_profile_dir_normalized)
                 
                 # Run the conversion asynchronously using the thread pool
                 # This prevents blocking the event loop while LibreOffice runs
                 def run_libreoffice():
+                    logger.info(f"Running LibreOffice command: {' '.join(cmd)}")
                     process = subprocess.Popen(
                         cmd,
                         stdout=subprocess.PIPE,
@@ -111,20 +122,122 @@ async def convert_pptx_bytes_to_pdf(pptx_bytes, request: Request):
                     )
                     try:
                         stdout, stderr = process.communicate(timeout=timeout)
+                        stdout_text = stdout.decode('utf-8', errors='ignore')
+                        stderr_text = stderr.decode('utf-8', errors='ignore')
+                        
+                        logger.info(f"LibreOffice stdout: {stdout_text}")
+                        
                         if process.returncode != 0:
-                            logger.error(f"LibreOffice conversion failed with code {process.returncode}: {stderr.decode()}")
+                            logger.error(f"LibreOffice conversion failed with code {process.returncode}: {stderr_text}")
                             raise Exception(f"LibreOffice conversion failed with code {process.returncode}")
+                        
+                        logger.info(f"LibreOffice conversion completed successfully")
                         return True
                     except subprocess.TimeoutExpired:
                         process.kill()
                         logger.error(f"LibreOffice conversion timed out after {timeout} seconds")
                         raise Exception(f"The presentation took too long to convert. This may be due to its size or complexity.")
                 
-                # Run the conversion in the thread pool and await its completion
-                await asyncio.get_event_loop().run_in_executor(
-                    libreoffice_pool, 
-                    run_libreoffice
-                )
+                # Try the conversion with the primary method
+                try:
+                    await asyncio.get_event_loop().run_in_executor(
+                        libreoffice_pool, 
+                        run_libreoffice
+                    )
+                except Exception as primary_error:
+                    logger.warning(f"Primary conversion method failed: {primary_error}. Trying fallback method...")
+                    
+                    # Fallback method with simpler command
+                    fallback_cmd = [
+                        soffice_path,
+                        '--headless',
+                        '--convert-to',
+                        'pdf',
+                        '--outdir',
+                        temp_dir_normalized,
+                        temp_pptx_path_normalized
+                    ]
+                    
+                    def run_fallback():
+                        logger.info(f"Running fallback LibreOffice command: {' '.join(fallback_cmd)}")
+                        process = subprocess.Popen(
+                            fallback_cmd,
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE
+                        )
+                        try:
+                            stdout, stderr = process.communicate(timeout=timeout)
+                            stdout_text = stdout.decode('utf-8', errors='ignore')
+                            stderr_text = stderr.decode('utf-8', errors='ignore')
+                            
+                            logger.info(f"Fallback LibreOffice stdout: {stdout_text}")
+                            
+                            if process.returncode != 0:
+                                logger.error(f"Fallback LibreOffice conversion failed with code {process.returncode}: {stderr_text}")
+                                raise Exception(f"Both conversion methods failed. Original error: {primary_error}. Fallback error: LibreOffice conversion failed with code {process.returncode}")
+                            
+                            logger.info(f"Fallback LibreOffice conversion completed successfully")
+                            return True
+                        except subprocess.TimeoutExpired:
+                            process.kill()
+                            logger.error(f"Fallback LibreOffice conversion timed out after {timeout} seconds")
+                            raise Exception(f"Both conversion methods failed. Original error: {primary_error}. Fallback error: The presentation took too long to convert.")
+                    
+                    try:
+                        # Run the fallback conversion
+                        await asyncio.get_event_loop().run_in_executor(
+                            libreoffice_pool, 
+                            run_fallback
+                        )
+                    except Exception as fallback_error:
+                        logger.warning(f"Fallback conversion method failed: {fallback_error}. Trying last resort method...")
+                        
+                        # Last resort method - direct conversion without user profile
+                        last_resort_cmd = [
+                            soffice_path,
+                            '--headless',
+                            '--norestore',
+                            '--nologo',
+                            '--nolockcheck',
+                            '--convert-to',
+                            'pdf',
+                            temp_pptx_path_normalized
+                        ]
+                        
+                        def run_last_resort():
+                            logger.info(f"Running last resort LibreOffice command: {' '.join(last_resort_cmd)}")
+                            # Create a new temporary directory for the output
+                            output_dir = os.path.dirname(temp_pptx_path)
+                            
+                            process = subprocess.Popen(
+                                last_resort_cmd,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                cwd=output_dir  # Set the working directory to control output location
+                            )
+                            try:
+                                stdout, stderr = process.communicate(timeout=timeout)
+                                stdout_text = stdout.decode('utf-8', errors='ignore')
+                                stderr_text = stderr.decode('utf-8', errors='ignore')
+                                
+                                logger.info(f"Last resort LibreOffice stdout: {stdout_text}")
+                                
+                                if process.returncode != 0:
+                                    logger.error(f"Last resort LibreOffice conversion failed with code {process.returncode}: {stderr_text}")
+                                    raise Exception(f"All conversion methods failed. Original error: {primary_error}. Fallback error: {fallback_error}. Last resort error: LibreOffice conversion failed with code {process.returncode}")
+                                
+                                logger.info(f"Last resort LibreOffice conversion completed successfully")
+                                return True
+                            except subprocess.TimeoutExpired:
+                                process.kill()
+                                logger.error(f"Last resort LibreOffice conversion timed out after {timeout} seconds")
+                                raise Exception(f"All conversion methods failed. Original error: {primary_error}. Fallback error: {fallback_error}. Last resort error: The presentation took too long to convert.")
+                        
+                        # Run the last resort conversion
+                        await asyncio.get_event_loop().run_in_executor(
+                            libreoffice_pool, 
+                            run_last_resort
+                        )
                 
             except Exception as e:
                 logger.error(f"Error during LibreOffice conversion: {str(e)}")
