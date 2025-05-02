@@ -1,12 +1,33 @@
+// Track active requests
+let activeStatusUpdates = {};
+let activeSystemActions = {
+    killLibreOffice: null,
+    restartApp: null
+};
+let activeFetches = {
+    stats: null,
+    bugReports: null
+};
+
 // Global function to update bug report status
 function updateBugStatus(reportId, newStatus) {
     if (confirm(`Are you sure you want to update the status of bug report #${reportId}?`)) {
+        // Abort previous request for this report if it exists
+        if (activeStatusUpdates[reportId] instanceof AbortController) {
+            activeStatusUpdates[reportId].abort();
+        }
+        
+        // Create new abort controller
+        activeStatusUpdates[reportId] = new AbortController();
+        const signal = activeStatusUpdates[reportId].signal;
+        
         fetch(`/api/system/bug-reports/${reportId}/status`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ status: newStatus })
+            body: JSON.stringify({ status: newStatus }),
+            signal: signal
         })
         .then(response => {
             if (!response.ok) {
@@ -20,8 +41,10 @@ function updateBugStatus(reportId, newStatus) {
             document.getElementById('refreshBugReports').click();
         })
         .catch(error => {
-            console.error('Error updating bug status:', error);
-            alert('Failed to update bug status');
+            if (error.name !== 'AbortError') {
+                console.error('Error updating bug status:', error);
+                alert('Failed to update bug status');
+            }
         });
     }
 }
@@ -84,6 +107,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const memoryGauge = createGauge('memoryGauge', 'Memory Usage');
     const diskGauge = createGauge('diskGauge', 'Disk Usage');
     
+    
     // Fetch system stats initially
     fetchSystemStats();
     
@@ -93,36 +117,92 @@ document.addEventListener('DOMContentLoaded', function() {
     // Set up auto-refresh every 15 seconds
     const refreshInterval = setInterval(fetchSystemStats, 15000);
     
+    // Clean up on page unload
+    window.addEventListener('beforeunload', function() {
+        // Clear interval
+        clearInterval(refreshInterval);
+        
+        // Abort any active fetches
+        for (const key in activeFetches) {
+            if (activeFetches[key] instanceof AbortController) {
+                activeFetches[key].abort();
+            }
+        }
+        
+        // Abort any active system action requests
+        for (const key in activeSystemActions) {
+            if (activeSystemActions[key] instanceof AbortController) {
+                activeSystemActions[key].abort();
+            }
+        }
+        
+        // Abort any active status update requests
+        for (const key in activeStatusUpdates) {
+            if (activeStatusUpdates[key] instanceof AbortController) {
+                activeStatusUpdates[key].abort();
+            }
+        }
+    });
+    
     // Manual refresh buttons
     document.getElementById('refreshSystemStats').addEventListener('click', fetchSystemStats);
     document.getElementById('refreshBugReports').addEventListener('click', fetchBugReports);
     
+    
     // System action buttons
     document.getElementById('killLibreOfficeBtn').addEventListener('click', function() {
         if (confirm('Are you sure you want to kill all LibreOffice processes?')) {
-            fetch('/api/system/kill-libreoffice', { method: 'POST' })
+            // Abort previous request if it exists
+            if (activeSystemActions.killLibreOffice instanceof AbortController) {
+                activeSystemActions.killLibreOffice.abort();
+            }
+            
+            // Create new abort controller
+            activeSystemActions.killLibreOffice = new AbortController();
+            const signal = activeSystemActions.killLibreOffice.signal;
+            
+            fetch('/api/system/kill-libreoffice', { 
+                method: 'POST',
+                signal: signal
+            })
                 .then(response => response.json())
                 .then(data => {
                     alert(data.message);
                     fetchSystemStats(); // Refresh stats after action
                 })
                 .catch(error => {
-                    console.error('Error:', error);
-                    alert('Failed to kill LibreOffice processes');
+                    if (error.name !== 'AbortError') {
+                        console.error('Error:', error);
+                        alert('Failed to kill LibreOffice processes');
+                    }
                 });
         }
     });
     
     document.getElementById('restartAppBtn').addEventListener('click', function() {
         if (confirm('Are you sure you want to restart the application? This will disconnect all users.')) {
-            fetch('/api/system/restart-app', { method: 'POST' })
+            // Abort previous request if it exists
+            if (activeSystemActions.restartApp instanceof AbortController) {
+                activeSystemActions.restartApp.abort();
+            }
+            
+            // Create new abort controller
+            activeSystemActions.restartApp = new AbortController();
+            const signal = activeSystemActions.restartApp.signal;
+            
+            fetch('/api/system/restart-app', { 
+                method: 'POST',
+                signal: signal
+            })
                 .then(response => response.json())
                 .then(data => {
                     alert(data.message);
                 })
                 .catch(error => {
-                    console.error('Error:', error);
-                    alert('Failed to restart application');
+                    if (error.name !== 'AbortError') {
+                        console.error('Error:', error);
+                        alert('Failed to restart application');
+                    }
                 });
         }
     });
@@ -178,7 +258,16 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Fetch bug reports from API
     function fetchBugReports() {
-        fetch('/api/system/bug-reports')
+        // Abort previous fetch if it exists
+        if (activeFetches.bugReports instanceof AbortController) {
+            activeFetches.bugReports.abort();
+        }
+        
+        // Create new abort controller
+        activeFetches.bugReports = new AbortController();
+        const signal = activeFetches.bugReports.signal;
+        
+        fetch('/api/system/bug-reports', { signal })
             .then(response => {
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
@@ -247,15 +336,26 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             })
             .catch(error => {
-                console.error('Error fetching bug reports:', error);
-                document.getElementById('bugReportsTable').innerHTML = 
-                    '<tr><td colspan="6" class="text-center text-danger">Error fetching bug reports</td></tr>';
+                if (error.name !== 'AbortError') {
+                    console.error('Error fetching bug reports:', error);
+                    document.getElementById('bugReportsTable').innerHTML = 
+                        '<tr><td colspan="6" class="text-center text-danger">Error fetching bug reports</td></tr>';
+                }
             });
     }
     
     // Fetch system stats from API
     function fetchSystemStats() {
-        fetch('/api/system/stats')
+        // Abort previous fetch if it exists
+        if (activeFetches.stats instanceof AbortController) {
+            activeFetches.stats.abort();
+        }
+        
+        // Create new abort controller
+        activeFetches.stats = new AbortController();
+        const signal = activeFetches.stats.signal;
+        
+        fetch('/api/system/stats', { signal })
             .then(response => {
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
@@ -337,12 +437,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('lastUpdated').textContent = `Last updated: ${now.toLocaleTimeString()}`;
             })
             .catch(error => {
-                console.error('Error fetching system stats:', error);
-                document.getElementById('cpuInfo').textContent = 'Error fetching data';
-                document.getElementById('memoryInfo').textContent = 'Error fetching data';
-                document.getElementById('diskInfo').textContent = 'Error fetching data';
-                document.getElementById('topProcessesTable').innerHTML = '<tr><td colspan="4" class="text-center text-danger">Error fetching process data</td></tr>';
-                document.getElementById('libreofficeProcesses').innerHTML = '<div class="alert alert-danger">Error fetching process data</div>';
+                if (error.name !== 'AbortError') {
+                    console.error('Error fetching system stats:', error);
+                    document.getElementById('cpuInfo').textContent = 'Error fetching data';
+                    document.getElementById('memoryInfo').textContent = 'Error fetching data';
+                    document.getElementById('diskInfo').textContent = 'Error fetching data';
+                    document.getElementById('topProcessesTable').innerHTML = '<tr><td colspan="4" class="text-center text-danger">Error fetching process data</td></tr>';
+                    document.getElementById('libreofficeProcesses').innerHTML = '<div class="alert alert-danger">Error fetching process data</div>';
+                }
             });
     }
 });
