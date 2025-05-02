@@ -175,21 +175,20 @@ async def google_auth_callback(
         # If the user does not exist, add them to the database
         if not user:
             insert_query = """
-                INSERT INTO user (email, password, account_activated, login_method, alias)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO user (email, password, account_activated, login_method, alias, premium_status, member_since)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
             """
-            cursor.execute(insert_query, (email, pwd_context.hash(generate_password()), True, 'google', alias))  # Set login_method to 'google'
+            cursor.execute(insert_query, (email, pwd_context.hash(generate_password()), True, 'google', alias, 0, datetime.now()))  # Set login_method to 'google'
             db.commit()
 
             user_id = cursor.lastrowid  # Get the inserted user ID
             account_activated = True
             premium_status = 0  # Default to free user
-            member_since = None  # Set as None, will update later if needed
+            member_since = datetime.now()  # Set current time
             alias = alias  # Generated alias
         else:
             # User already exists, get their data
             user_id = user['user_id']
-            account_activated = user['account_activated']
             premium_status = user['premium_status']
             member_since = user['member_since']
             alias = user['alias']
@@ -197,6 +196,16 @@ async def google_auth_callback(
             # Check if the user registered with a different method
             if user['login_method'] != 'google':
                 raise HTTPException(status_code=403, detail="You registered with a different login method. Please use that method to log in.")
+            
+            # Ensure account is activated for Google login users
+            if not user['account_activated']:
+                # Update account_activated to True for Google login users
+                update_query = "UPDATE user SET account_activated = %s WHERE user_id = %s"
+                cursor.execute(update_query, (True, user_id))
+                db.commit()
+            
+            # Always set account_activated to True for Google login
+            account_activated = True
 
         cursor.close()
 
@@ -227,14 +236,80 @@ async def logout(request: Request, response: Response):
 
 # Route to display the upgrade page
 @users.get("/upgrade", response_class=HTMLResponse)
-async def show_upgrade_page(request: Request):
+async def show_upgrade_page(
+    request: Request,
+    downgrade: str = None,
+    db: mysql.connector.connection.MySQLConnection = Depends(get_db)
+):
     # Ensure the user is logged in
     if 'user_id' not in request.session:
         return RedirectResponse(url="/login")
-        
+    
     # Get user's current premium status
     premium_status = request.session.get('premium_status', 0)
-    return templates.TemplateResponse("users/upgrade.html", {"request": request, "premium_status": premium_status})
+    user_id = request.session.get('user_id')
+    
+    # Check if this is a downgrade request
+    if downgrade is not None:
+        try:
+            # Convert downgrade parameter to int
+            target_tier = int(downgrade)
+            
+            # Import the check_downgrade_eligibility function
+            from helpers.subscription_utils import check_downgrade_eligibility
+            
+            # Check if the user is eligible to downgrade
+            eligible, message = check_downgrade_eligibility(user_id, target_tier, db)
+            
+            if eligible:
+                # Update the user's premium status in the database
+                cursor = db.cursor()
+                update_query = "UPDATE user SET premium_status = %s WHERE user_id = %s"
+                cursor.execute(update_query, (target_tier, user_id))
+                db.commit()
+                cursor.close()
+                
+                # Update the session
+                request.session['premium_status'] = target_tier
+                
+                # Redirect to the dashboard with a success message
+                response = RedirectResponse(url="/dashboard", status_code=303)
+                set_flash_message(response, "Your account has been downgraded successfully.")
+                return response
+            else:
+                # Redirect to the account page with an error message
+                response = RedirectResponse(url="/account", status_code=303)
+                set_flash_message(response, f"Cannot downgrade: {message}")
+                return response
+        except Exception as e:
+            # If anything goes wrong, redirect with an error message
+            response = RedirectResponse(url="/account", status_code=303)
+            set_flash_message(response, f"Error processing downgrade: {str(e)}")
+            return response
+    
+    # Get next billing date if the user has a premium subscription
+    next_billing_date = None
+    if premium_status > 0:
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("SELECT member_since FROM user WHERE user_id = %s", (user_id,))
+        user_data = cursor.fetchone()
+        cursor.close()
+        
+        if user_data and 'member_since' in user_data:
+            from datetime import datetime, timedelta
+            try:
+                member_since = user_data['member_since']
+                member_since_date = datetime.strptime(str(member_since), "%Y-%m-%d %H:%M:%S")
+                next_billing_date = (member_since_date + timedelta(days=30)).strftime("%Y-%m-%d")
+            except:
+                next_billing_date = "Unknown"
+    
+    # If not a downgrade request, show the upgrade page
+    return templates.TemplateResponse("users/upgrade.html", {
+        "request": request, 
+        "premium_status": premium_status,
+        "next_billing_date": next_billing_date
+    })
 
 # Activation endpoint
 @users.get("/activate-account/{token}")

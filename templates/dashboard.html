@@ -2,6 +2,8 @@
 
 {% block title %}Dashboard | SlidePull{% endblock %}
 
+{% block body_attributes %}data-premium-status="{{ premium_status }}"{% endblock %}
+
 {% block content %}
 <!-- Loading Overlay for Upload Process -->
 <div id="uploadLoadingOverlay" class="position-fixed top-0 start-0 w-100 h-100 d-none" style="z-index: 9999; background-color: rgba(0, 48, 143, 0.8);">
@@ -21,7 +23,7 @@
                 <div class="file-info mb-4">
                     <div class="d-flex justify-content-between mb-2">
                         <span style="color: #495057;">File:</span>
-                        <span class="fw-medium" id="fileNameDisplay" style="color: #333333;">presentation.pptx</span>
+                        <span class="fw-medium" id="overlayFileNameDisplay" style="color: #333333;">presentation.pptx</span>
                     </div>
                     <div class="d-flex justify-content-between">
                         <span style="color: #495057;">Size:</span>
@@ -42,35 +44,133 @@
         </div>
     </div>
 </div>
-<!-- User Profile Section -->
+
+<!-- Top Section: User Profile and Upload -->
 <div class="row mb-4">
-    <div class="col-lg-12">
-        <div class="card bg-light-gray card-navy-shadow"> {# Added card-navy-shadow #}
+    <!-- Upload Section -->
+    <div class="col-lg-6 mb-4 mb-lg-0">
+        <div class="card mb-0 card-navy-shadow h-100">
+            <div class="card-header bg-white">
+                <h2 class="section-title h4 mb-0">
+                    <i class="fas fa-upload me-2"></i> Upload Presentation Slot
+                </h2>
+            </div>
             <div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-md-8">
-                        <h1 class="mb-2">Welcome, {{ email }}</h1>
-                        <div class="d-flex flex-wrap">
-                            <span class="badge bg-secondary me-2 mb-2">Member since: {{ member_since }}</span>
-                            {% if premium_status %}
-                                <span class="badge bg-success me-2 mb-2">Premium User</span>
-                            {% else %}
-                                <span class="badge bg-secondary me-2 mb-2">Free User</span>
-                            {% endif %}
-                            <span class="badge bg-info me-2 mb-2">User ID: {{ user_id }}</span>
-                        </div>
+                {% if premium_status == 0 and presentations and presentations|length >= 1 %}
+                    <div class="alert alert-warning">
+                        <i class="fas fa-exclamation-circle me-2"></i> You've reached your upload limit.
+                        Please delete an existing presentation slot before uploading a new one.
                     </div>
-                    <div class="col-md-4 text-md-end mt-3 mt-md-0">
-                        {% if is_admin %}
-                            <a href="/admin" class="btn btn-danger me-2">
-                                <i class="fas fa-cogs me-1"></i> Admin Panel
-                            </a>
-                        {% endif %}
-                        {% if not premium_status %}
-                            <a href="/upgrade" class="btn btn-outline-primary">
-                                <i class="fas fa-crown me-1"></i> Upgrade to Premium
-                            </a>
-                        {% endif %}
+                {% else %}
+                    <form id="uploadForm" action="/upload-pptx" method="post" enctype="multipart/form-data">
+                        <div class="row">
+                            <div class="col-12 mb-3">
+                                <label for="fileNameDisplay" class="form-label">Selected File:</label>
+                                <input type="text" id="fileNameDisplay" class="form-control" readonly value="No file chosen">
+                            </div>
+                            <div class="col-12">
+                                <div class="d-flex gap-2">
+                                    <input type="file" id="pptx_file" name="pptx_file" accept=".pptx" required style="display: none;">
+                                    <button type="button" id="chooseFileButton" class="btn btn-outline-primary" style="width: 120px; height: 100px;">
+                                        <i class="fas fa-folder-open me-1"></i>
+                                        Choose file
+                                    </button>
+                                    <button type="submit" id="uploadButton" class="btn btn-primary {% if not account_activated %}btn-secondary{% endif %}" style="width: 120px; height: 100px;"
+                                            {% if not account_activated %}disabled
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="top"
+                                            title="Please check your email to activate your account"{% endif %}>
+                                        {% if not account_activated %}
+                                            Please check your email to activate your account
+                                        {% else %}
+                                            <i class="fas fa-cloud-upload-alt me-1"></i> Upload
+                                        {% endif %}
+                                    </button>
+                                </div>
+                                <div class="form-text mt-2">
+                                    Only .pptx files are supported. 
+                                    Maximum file size: 
+                                    {% if premium_status == 0 %}
+                                        20MB (Free tier)
+                                    {% elif premium_status == 1 %}
+                                        30MB (Premium tier)
+                                    {% elif premium_status == 2 %}
+                                        50MB (Corporate tier)
+                                    {% endif %}
+                                </div>
+                                {% if not account_activated %}
+                                    <div class="form-text text-danger mt-2">
+                                        <i class="fas fa-exclamation-circle me-1"></i> Please activate your account to upload presentations.
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </form>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- User Profile Section -->
+    <div class="col-lg-6">
+        <div class="card bg-light-gray card-navy-shadow h-100">
+            <div class="card-body d-flex flex-column">
+                <h1 class="mb-2">Welcome, {{ email }}</h1>
+                <div class="d-flex flex-wrap mb-3">
+                    <span class="badge bg-secondary me-2 mb-2">Member since: {{ member_since }}</span>
+                    {% if premium_status %}
+                        <span class="badge bg-success me-2 mb-2">Premium User</span>
+                    {% else %}
+                        <span class="badge bg-secondary me-2 mb-2">Free User</span>
+                    {% endif %}
+                    <span class="badge bg-info me-2 mb-2">User ID: {{ user_id }}</span>
+                </div>
+                
+                {% if not premium_status %}
+                    <div class="mt-3">
+                        <a href="/upgrade" class="btn btn-outline-primary">
+                            <i class="fas fa-crown me-1"></i> Upgrade to Premium
+                        </a>
+                    </div>
+                {% endif %}
+                
+                {% if is_admin %}
+                    <div class="mt-3">
+                        <a href="/admin" class="btn btn-danger">
+                            <i class="fas fa-cogs me-1"></i> Admin Panel
+                        </a>
+                    </div>
+                {% endif %}
+                
+                <!-- Social Icons -->
+                <div class="mt-auto pt-4">
+                    <hr class="my-3">
+                    <h5 class="mb-3">Connect With Us</h5>
+                    <div class="d-flex flex-wrap gap-2">
+                        <!-- Bug Report Button -->
+                        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#bugReportModal">
+                            <i class="fas fa-bug"></i>
+                        </button>
+                        
+                        <!-- Contact Button -->
+                        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#contactModal">
+                            <i class="fas fa-envelope"></i>
+                        </button>
+                        
+                        <!-- LinkedIn Button -->
+                        <a href="https://linkedin.com" target="_blank" class="btn btn-outline-primary">
+                            <i class="fab fa-linkedin-in"></i>
+                        </a>
+                        
+                        <!-- Reddit Button -->
+                        <a href="https://reddit.com" target="_blank" class="btn btn-outline-danger">
+                            <i class="fab fa-reddit-alien"></i>
+                        </a>
+                        
+                        <!-- Facebook Button -->
+                        <a href="https://facebook.com" target="_blank" class="btn btn-outline-primary">
+                            <i class="fab fa-facebook-f"></i>
+                        </a>
                     </div>
                 </div>
             </div>
@@ -106,118 +206,25 @@
     </div>
 {% endif %}
 
-<!-- Upload Section -->
-<div class="card mb-4 card-navy-shadow"> {# Added card-navy-shadow #}
-    <div class="card-header bg-white">
-        <h2 class="section-title h4 mb-0">
-            <i class="fas fa-upload me-2"></i> Upload Presentation Slot
-        </h2>
-    </div>
-    <div class="card-body">
-        {% if premium_status == 0 and presentations and presentations|length >= 1 %}
-            <div class="alert alert-warning">
-                <i class="fas fa-exclamation-circle me-2"></i> You've reached your upload limit.
-                Please delete an existing presentation slot before uploading a new one.
-            </div>
-        {% else %}
-                <form id="uploadForm" action="/upload-pptx" method="post" enctype="multipart/form-data">
-                    <div class="row">
-                        <div class="col-12 mb-3">
-                            <label for="fileNameDisplay" class="form-label">Selected File:</label>
-                            <input type="text" id="fileNameDisplay" class="form-control" readonly value="No file chosen"> {# Text input for file name #}
-                        </div>
-                        <div class="col-12">
-                            <div class="d-flex gap-2">
-                                {# Hidden file input #}
-                                <input type="file" id="pptx_file" name="pptx_file" accept=".pptx" required style="display: none;">
-
-                                {# Custom "Choose file" button #}
-                                <button type="button" id="chooseFileButton" class="btn btn-outline-primary" style="width: 120px; height: 100px;"> {# Increased width #}
-                                    <i class="fas fa-folder-open me-1"></i> {# Added me-1 back for spacing #}
-                                    Choose file
-                                </button>
-
-                                {# Upload button #}
-                                <button type="submit" id="uploadButton" class="btn btn-primary {% if not account_activated %}btn-secondary{% endif %}" style="width: 120px; height: 100px;" {# Increased width #}
-                                        {% if not account_activated %}disabled
-                                        data-bs-toggle="tooltip"
-                                        data-bs-placement="top"
-                                        title="Please check your email to activate your account"{% endif %}>
-                                    {% if not account_activated %}
-                                        Please check your email to activate your account
-                                    {% else %}
-                                        <i class="fas fa-cloud-upload-alt me-1"></i> Upload
-                                    {% endif %}
-                                </button>
-                            </div>
-                            <div class="form-text mt-2">Only .pptx files are supported. Maximum file size: 50MB.</div>
-                            {% if not account_activated %}
-                                <div class="form-text text-danger mt-2">
-                                    <i class="fas fa-exclamation-circle me-1"></i> Please activate your account to upload presentations.
-                                </div>
-                            {% endif %}
-                        </div>
-                    </div>
-                </form>
-                <script>
-                    document.addEventListener('DOMContentLoaded', function() {
-                        const tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
-                        tooltipTriggerList.map(function (tooltipTriggerEl) {
-                            return new bootstrap.Tooltip(tooltipTriggerEl);
-                        });
-
-                        const fileInput = document.getElementById('pptx_file');
-                        const chooseFileButton = document.getElementById('chooseFileButton');
-                        const fileNameDisplay = document.getElementById('fileNameDisplay');
-                        const uploadButton = document.getElementById('uploadButton');
-
-                        // Trigger file input click when "Choose file" button is clicked
-                        chooseFileButton.addEventListener('click', function() {
-                            fileInput.click();
-                        });
-
-                        // Update file name display when a file is selected
-                        fileInput.addEventListener('change', function() {
-                            if (fileInput.files && fileInput.files.length > 0) {
-                                fileNameDisplay.value = fileInput.files[0].name;
-                                // Enable upload button if a file is selected and account is activated
-                                if (!uploadButton.disabled) { // Check if it's not disabled by account activation status
-                                     uploadButton.classList.remove('btn-secondary');
-                                     uploadButton.classList.add('btn-primary');
-                                     uploadButton.innerHTML = '<i class="fas fa-cloud-upload-alt me-1"></i> Upload';
-                                }
-                            } else {
-                                fileNameDisplay.value = 'No file chosen';
-                                // Optionally disable upload button if no file is selected
-                                // uploadButton.disabled = true;
-                                // uploadButton.classList.remove('btn-primary');
-                                // uploadButton.classList.add('btn-secondary');
-                                // uploadButton.innerHTML = 'Choose file first';
-                            }
-                        });
-
-                         // Handle initial state of upload button based on account activation
-                         if (uploadButton.disabled) {
-                             uploadButton.classList.remove('btn-primary');
-                             uploadButton.classList.add('btn-secondary');
-                             uploadButton.innerHTML = 'Please check your email to activate your account';
-                         }
-                    });
-                </script>
-        {% endif %}
-    </div>
-</div>
-
 <!-- Presentation Slots List -->
 <div class="card card-navy-shadow"> {# Added card-navy-shadow #}
     <div class="card-header bg-white">
         <h2 class="section-title h4 mb-0">
-            <i class="fas fa-file-powerpoint me-2"></i> Your Presentation Slots
+            <i class="fas fa-file-powerpoint me-2"></i> Used Presentation Slots 
+            <span class="badge bg-secondary ms-2">
+                {% if premium_status == 0 %}
+                    {{ presentations|length }}/1
+                {% elif premium_status == 1 %}
+                    {{ presentations|length }}/3 {# Premium users get 3 slots #}
+                {% elif premium_status == 2 %}
+                    {{ presentations|length }}/6 {# Corporate users get 6 slots #}
+                {% endif %}
+            </span>
         </h2>
     </div>
     <div class="card-body">
-        {% if presentations %}
-            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4"> {# Use Bootstrap grid for cards #}
+        <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4"> {# Use Bootstrap grid for cards #}
+            {% if presentations %}
                 {% for presentation in presentations %}
                     <div class="col"> {# Each column will contain a card #}
                         <div class="card h-100 border shadow-sm"> {# Added 'border' class #}
@@ -225,7 +232,13 @@
                                 <div class="d-flex justify-content-between align-items-center">
                                     <h3 class="h5 mb-0">
                                         <i class="fas fa-file-powerpoint me-2"></i>
-                                        {{ presentation.original_filename }} {# Presentation Title #}
+                                        {% if premium_status == 0 %}
+                                            Presentation {{ loop.index }}/1
+                                        {% elif premium_status == 1 %}
+                                            Presentation {{ loop.index }}/3
+                                        {% elif premium_status == 2 %}
+                                            Presentation {{ loop.index }}/6
+                                        {% endif %}
                                     </h3>
                                     <div>
                                         <form action="/delete-presentation/{{ presentation.pdf_id }}" method="POST" class="d-inline">
@@ -238,16 +251,18 @@
                                 </div>
                             </div>
                             <div class="card-body d-flex flex-column">
+                                {# Display filename #}
+                                <p class="card-text mb-2"><small class="text-muted"><strong>Filename:</strong> {{ presentation.original_filename }}</small></p>
                                 {# Display number of slides and size #}
-                                <p class="card-text mb-2"><small class="text-muted">Slides: {{ presentation.num_slides }}</small></p>
-                                <p class="card-text mb-3"><small class="text-muted">Size: {{ presentation.file_size_kb }} KB</small></p>
+                                <p class="card-text mb-2"><small class="text-muted"><strong>Slides:</strong> {{ presentation.num_slides }} | <strong>Size:</strong> {{ presentation.file_size_kb }} KB</small></p>
+                                <p class="card-text mb-3"><small class="text-muted"><strong>Downloaded:</strong> {{ presentation.download_count|default(0) }} times</small></p>
 
-                                <div class="d-flex flex-wrap gap-2 mb-3">
+                                <div class="d-flex flex-wrap gap-2 mb-3" style="min-height: 38px;">
                                     <a href="/select-slides/{{ presentation.pdf_id }}" class="btn btn-primary btn-sm flex-grow-1">
                                         <i class="fas fa-images me-1"></i> Create new set
                                     </a>
-                                    <a href="#" class="btn btn-outline-secondary btn-sm flex-grow-1 download-qr-btn" data-pdf-id="{{ presentation.pdf_id }}">
-                                        <i class="fas fa-qrcode me-1"></i> Download QR Code for .pdf file
+                                    <a href="#" class="btn btn-outline-secondary btn-sm flex-grow-1 download-qr-btn" data-pdf-id="{{ presentation.pdf_id }}" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                        <i class="fas fa-qrcode me-1"></i> Download QR Code for PDF file
                                     </a>
                                 </div>
 
@@ -260,8 +275,11 @@
                                     <ul class="list-group list-group-flush">
                                         {% for set in presentation.sets %}
                                             <li class="list-group-item d-flex justify-content-between align-items-center py-2 px-0">
-                                                {{ set.name }}
-                                                <a href="{{ set.qrcode_url_with_sas }}" class="btn btn-outline-primary btn-sm" download>
+                                                <div>
+                                                    {{ set.name }}
+                                                    <div><small class="text-muted"><strong>Slides:</strong> {{ set.slide_count|default(0) }} | <strong>Downloaded:</strong> {{ set.download_count|default(0) }} times</small></div>
+                                                </div>
+                                                <a href="{{ set.qrcode_url_with_sas }}" class="btn btn-outline-primary btn-sm set-download-btn" data-set-id="{{ set.set_id }}" download>
                                                     <i class="fas fa-qrcode"></i> {# Download QR icon #}
                                                 </a>
                                             </li>
@@ -276,128 +294,127 @@
                         </div>
                     </div>
                 {% endfor %}
-            </div>
-        {% else %}
-            <div class="text-center py-5">
-                <i class="fas fa-file-upload fa-3x mb-3 text-muted"></i>
-                <p class="lead text-muted">No presentation slots uploaded yet.</p>
-                <p>Upload your first PowerPoint presentation to get started.</p>
-            </div>
-        {% endif %}
+            {% endif %}
+            
+            {# Add empty slots #}
+            {% if premium_status == 1 %}
+                {# For premium users, show remaining empty slots (up to 3 total) #}
+                {% for i in range(presentations|length, 3) %}
+                    <div class="col">
+                        <div class="card h-100 border shadow-sm">
+                            <div class="card-header bg-light-gray">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h3 class="h5 mb-0">
+                                        <i class="fas fa-file-powerpoint me-2"></i>
+                                        Empty Slot {{ i+1 }}/3
+                                    </h3>
+                                </div>
+                            </div>
+                            <div class="card-body d-flex flex-column align-items-center justify-content-center">
+                                <i class="fas fa-file-upload fa-3x mb-3 text-muted"></i>
+                                <p class="text-muted">Empty presentation slot</p>
+                                <p class="small text-center">Upload a PowerPoint presentation to use this slot.</p>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% elif premium_status == 2 %}
+                {# For corporate users, show remaining empty slots (up to 6 total) #}
+                {% for i in range(presentations|length, 6) %}
+                    <div class="col">
+                        <div class="card h-100 border shadow-sm">
+                            <div class="card-header bg-light-gray">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h3 class="h5 mb-0">
+                                        <i class="fas fa-file-powerpoint me-2"></i>
+                                        Empty Slot {{ i+1 }}/6
+                                    </h3>
+                                </div>
+                            </div>
+                            <div class="card-body d-flex flex-column align-items-center justify-content-center">
+                                <i class="fas fa-file-upload fa-3x mb-3 text-muted"></i>
+                                <p class="text-muted">Empty presentation slot</p>
+                                <p class="small text-center">Upload a PowerPoint presentation to use this slot.</p>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% elif not presentations %}
+                {# For free users with no presentations, show one empty slot #}
+                <div class="col">
+                    <div class="card h-100 border shadow-sm">
+                        <div class="card-header bg-light-gray">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <h3 class="h5 mb-0">
+                                    <i class="fas fa-file-powerpoint me-2"></i>
+                                    Empty Slot 1/1
+                                </h3>
+                            </div>
+                        </div>
+                        <div class="card-body d-flex flex-column align-items-center justify-content-center">
+                            <i class="fas fa-file-upload fa-3x mb-3 text-muted"></i>
+                            <p class="text-muted">Empty presentation slot</p>
+                            <p class="small text-center">Upload your first PowerPoint presentation to get started.</p>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
     </div>
 </div>
-<!-- JavaScript for Upload Progress Tracking -->
-<script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const uploadForm = document.getElementById('uploadForm');
-        
-        if (uploadForm) {
-            uploadForm.addEventListener('submit', function(e) {
-                // Show the loading overlay
-                document.getElementById('uploadLoadingOverlay').classList.remove('d-none');
-                
-                // Get the file input
-                const fileInput = document.getElementById('pptx_file');
-                if (!fileInput.files || fileInput.files.length === 0) {
-                    return; // No file selected
-                }
-                
-                // We'll create a unique ID for this upload based on timestamp
-                const uploadId = Date.now().toString();
-                
-                // Get file information
-                const file = fileInput.files[0];
-                const fileName = file.name;
-                const fileSize = Math.round(file.size / 1024); // Size in KB
-                
-                // Show file information and loading animation
-                const progressBar = document.getElementById('uploadProgressBar');
-                const progressText = document.getElementById('uploadProgressText');
-                const loadingMessage = document.getElementById('uploadLoadingMessage');
-                
-                // Display presentation name and size
-                document.getElementById('fileNameDisplay').textContent = fileName;
-                document.getElementById('fileSizeDisplay').textContent = `${fileSize} KB`;
-                loadingMessage.textContent = `Processing: ${fileName}`;
-                
-                // Add warning for large presentations
-                if (fileSize > 1000) { // Assuming larger files have more slides
-                    const warningElement = document.createElement('div');
-                    warningElement.className = 'alert alert-warning';
-                    warningElement.innerHTML = '<i class="fas fa-exclamation-triangle me-2"></i> Please note, due to the size of the file, processing might take a bit longer than expected. But trust us, it\'s working.';
-                    document.getElementById('warningContainer').appendChild(warningElement);
-                }
-                
-                // Animate the progress bar - slower but steady animation
-                let progress = 0;
-                const interval = setInterval(() => {
-                    // Slowly increase progress up to 95%
-                    if (progress < 95) {
-                        progress += 0.5;
-                        progressBar.style.width = `${progress}%`;
-                    }
-                }, 500);
-            });
-        }
-    });
+<!-- Bug Report Modal -->
+<div class="modal fade" id="bugReportModal" tabindex="-1" aria-labelledby="bugReportModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="bugReportModalLabel">Report a Bug</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="bugReportForm" action="/submit-bug-report" method="post">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="bugDescription" class="form-label">Bug Description</label>
+                        <textarea class="form-control" id="bugDescription" name="bug_description" rows="5" required placeholder="Please describe the bug in detail. What happened? What did you expect to happen?"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Submit Bug Report</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
-    // Handle QR code download button click
-    document.querySelectorAll('.download-qr-btn').forEach(button => {
-        button.addEventListener('click', async function(e) {
-            e.preventDefault(); // Prevent default link behavior
+<!-- Contact Modal -->
+<div class="modal fade" id="contactModal" tabindex="-1" aria-labelledby="contactModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="contactModalLabel">Contact Us</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="contactForm" action="/send-contact-email" method="post">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="contactSubject" class="form-label">Subject</label>
+                        <input type="text" class="form-control" id="contactSubject" name="subject" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="contactMessage" class="form-label">Message</label>
+                        <textarea class="form-control" id="contactMessage" name="message" rows="5" required></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Send Message</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
-            const pdfId = this.dataset.pdfId;
-            const filenameElement = this.closest('.card').querySelector('.card-header h3');
-            let originalFilename = 'presentation'; // Default filename
-            if (filenameElement) {
-                originalFilename = filenameElement.textContent.trim(); // Get filename from h3
-            }
-            const baseFilename = originalFilename.replace(/\.[^/.]+$/, ""); // Remove extension
-
-            try {
-                // Show a simple loading indicator (optional, could enhance with a modal)
-                button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Generating...';
-                button.disabled = true;
-
-                const response = await fetch(`/generate-pdf-qr/${pdfId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json', // Or appropriate content type if sending a body
-                    },
-                    // If you need to send any data in the body, add it here:
-                    // body: JSON.stringify({ key: 'value' }),
-                });
-
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`HTTP error! status: ${response.status}, detail: ${errorText}`);
-                }
-
-                const blob = await response.blob();
-
-                // Create a link element and trigger the download
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = `${baseFilename}_qr.png`; // Set desired filename
-                document.body.appendChild(a);
-                a.click();
-
-                // Clean up
-                window.URL.revokeObjectURL(url);
-                a.remove();
-
-            } catch (error) {
-                console.error('Error downloading QR code:', error);
-                alert('Failed to generate or download QR code. Please try again.');
-            } finally {
-                 // Restore button state
-                 button.innerHTML = '<i class="fas fa-qrcode me-1"></i> Download QR Code for .pdf file';
-                 button.disabled = false;
-            }
-        });
-    });
-</script>
+<!-- Include Dashboard JavaScript -->
+<script src="{{ request.url_for('static', path='js/dashboard.js') }}"></script>
 
 {% endblock %}

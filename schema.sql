@@ -23,6 +23,7 @@ CREATE TABLE pdf (
     sas_token_expiry DATETIME,
     num_slides INT DEFAULT 0, -- Added column for number of slides
     file_size_kb INT DEFAULT 0, -- Added column for file size in KB
+    download_count INT DEFAULT 0, -- Added column for tracking downloads
     FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE
 );
 
@@ -60,6 +61,8 @@ CREATE TABLE `set` (
     qrcode_url VARCHAR(512),  -- Reduced length for QR code URL
     qrcode_sas_token VARCHAR(2048), -- SAS token for QR code
     qrcode_sas_token_expiry DATETIME, -- Expiry of the QR code SAS token
+    download_count INT DEFAULT 0, -- Added column for tracking downloads
+    slide_count INT DEFAULT 0, -- Added column for number of slides in the set
     FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE,
     FOREIGN KEY (pdf_id) REFERENCES pdf(pdf_id) ON DELETE CASCADE
 );

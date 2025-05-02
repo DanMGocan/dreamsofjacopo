@@ -1,0 +1,18 @@
+.feature-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#features {
+    scroll-margin-top: 80px;
+}
+
+#login {
+    scroll-margin-top: 80px;
+}
+
+/* Ensure consistent tab pane height */
+.tab-pane {
+    min-height: 320px;
+}

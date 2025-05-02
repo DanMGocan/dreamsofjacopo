@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+
+{% block title %}My Account | SlidePull{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col-lg-12">
+        <div class="card bg-light-gray card-navy-shadow">
+            <div class="card-header bg-white">
+                <h1 class="h3 mb-0 section-title">
+                    <i class="fas fa-user-circle me-2"></i> My Account
+                </h1>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6 mb-4 mb-md-0">
+                        <div class="card h-100">
+                            <div class="card-header bg-light-gray">
+                                <h2 class="h5 mb-0">
+                                    <i class="fas fa-id-card me-2"></i> Account Information
+                                </h2>
+                            </div>
+                            <div class="card-body">
+                                <dl class="row">
+                                    <dt class="col-sm-4"><strong>Email:</strong></dt>
+                                    <dd class="col-sm-8">{{ email }}</dd>
+                                    
+                                    <dt class="col-sm-4"><strong>User ID:</strong></dt>
+                                    <dd class="col-sm-8">{{ user_id }}</dd>
+                                    
+                                    <dt class="col-sm-4"><strong>Member Since:</strong></dt>
+                                    <dd class="col-sm-8">{{ member_since }}</dd>
+                                    
+                                    <dt class="col-sm-4"><strong>Account Type:</strong></dt>
+                                    <dd class="col-sm-8">
+                                        {% if premium_status == 0 %}
+                                            <span class="badge bg-secondary">Free</span>
+                                        {% elif premium_status == 1 %}
+                                            <span class="badge bg-success">Premium</span>
+                                        {% elif premium_status == 2 %}
+                                            <span class="badge bg-primary">Corporate</span>
+                                        {% endif %}
+                                    </dd>
+                                    
+                                    <dt class="col-sm-4"><strong>Account Status:</strong></dt>
+                                    <dd class="col-sm-8">
+                                        {% if account_activated %}
+                                            <span class="badge bg-success">Activated</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Not Activated</span>
+                                        {% endif %}
+                                    </dd>
+                                    
+                                    <dt class="col-sm-4"><strong>Login Method:</strong></dt>
+                                    <dd class="col-sm-8">
+                                        {% if login_method == "slide_pull" %}
+                                            <span class="badge bg-info">SlidePull</span>
+                                        {% elif login_method == "google" %}
+                                            <span class="badge bg-danger">Google</span>
+                                        {% elif login_method == "microsoft" %}
+                                            <span class="badge bg-primary">Microsoft</span>
+                                        {% endif %}
+                                    </dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header bg-light-gray">
+                                <h2 class="h5 mb-0">
+                                    <i class="fas fa-cogs me-2"></i> Account Actions
+                                </h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-grid gap-3">
+                                    {% if not account_activated %}
+                                        <form action="/activate-account" method="POST">
+                                            <button type="submit" class="btn btn-primary w-100">
+                                                <i class="fas fa-envelope me-2"></i> Activate Account
+                                            </button>
+                                            <small class="text-muted mt-1 d-block">This will send an activation email to your registered email address.</small>
+                                        </form>
+                                    {% endif %}
+                                    
+                                    {% if login_method == "slide_pull" %}
+                                        <form action="/change-password" method="POST" class="mb-3">
+                                            <div class="mb-3">
+                                                <label for="current_password" class="form-label">Current Password</label>
+                                                <input type="password" class="form-control" id="current_password" name="current_password" required>
+                                            </div>
+                                            <div class="mb-3">
+                                                <label for="new_password" class="form-label">New Password</label>
+                                                <input type="password" class="form-control" id="new_password" name="new_password" required>
+                                            </div>
+                                            <button type="submit" class="btn btn-outline-primary w-100">
+                                                <i class="fas fa-key me-2"></i> Change Password
+                                            </button>
+                                        </form>
+                                    {% else %}
+                                        <div class="alert alert-info">
+                                            <i class="fas fa-info-circle me-2"></i>
+                                            As your account was created with {{ login_method }}, you are not allowed to change your password.
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-light-gray">
+                                <h2 class="h5 mb-0">
+                                    <i class="fas fa-chart-bar me-2"></i> Account Usage
+                                </h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-3 mb-3 mb-md-0">
+                                        <div class="card text-center h-100">
+                                            <div class="card-body">
+                                                <h3 class="h1 mb-0">{{ presentations|length }}</h3>
+                                                <p class="text-muted">Presentations</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-3 mb-3 mb-md-0">
+                                        <div class="card text-center h-100">
+                                            <div class="card-body">
+                                                <h3 class="h1 mb-0">{{ sets_count|default(0) }}</h3>
+                                                <p class="text-muted">Sets Created</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-3 mb-3 mb-md-0">
+                                        <div class="card text-center h-100">
+                                            <div class="card-body">
+                                                <h3 class="h1 mb-0">{{ pdf_downloads|default(0) }}</h3>
+                                                <p class="text-muted">Presentations Downloaded</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-3">
+                                        <div class="card text-center h-100">
+                                            <div class="card-body">
+                                                <h3 class="h1 mb-0">{{ set_downloads|default(0) }}</h3>
+                                                <p class="text-muted">Sets Downloaded</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Subscription Management -->
+                <div class="row mt-4">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header bg-light-gray">
+                                <h2 class="h5 mb-0">
+                                    <i class="fas fa-credit-card me-2"></i> Manage My Subscription
+                                </h2>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6 mb-4 mb-md-0">
+                                        <h3 class="h6 mb-3">Current Subscription</h3>
+                                        <div class="card bg-light mb-3">
+                                            <div class="card-body">
+                                                <h4 class="h5 mb-3">
+                                                    {% if premium_status == 0 %}
+                                                        <span class="badge bg-secondary">Free Tier</span>
+                                                    {% elif premium_status == 1 %}
+                                                        <span class="badge bg-success">Premium Tier</span>
+                                                    {% elif premium_status == 2 %}
+                                                        <span class="badge bg-primary">Corporate Tier</span>
+                                                    {% endif %}
+                                                </h4>
+                                                
+                                                <dl class="row mb-0">
+                                                    <dt class="col-sm-6"><strong>Next Billing Date:</strong></dt>
+                                                    <dd class="col-sm-6">{{ next_billing_date|default('N/A') }}</dd>
+                                                    
+                                                    <dt class="col-sm-6"><strong>Next Billing Amount:</strong></dt>
+                                                    <dd class="col-sm-6">
+                                                        {% if premium_status == 0 %}
+                                                            €0.00
+                                                        {% elif premium_status == 1 %}
+                                                            €5.99
+                                                        {% elif premium_status == 2 %}
+                                                            €11.99
+                                                        {% endif %}
+                                                    </dd>
+                                                </dl>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="col-md-6">
+                                        <h3 class="h6 mb-3">Subscription Actions</h3>
+                                        <div class="d-grid gap-3">
+                                            {% if premium_status == 0 %}
+                                                <a href="/upgrade" class="btn btn-success">
+                                                    <i class="fas fa-arrow-up me-2"></i> Upgrade Subscription
+                                                </a>
+                                            {% elif premium_status == 1 %}
+                                                <div class="d-grid gap-2">
+                                                    <a href="/upgrade" class="btn btn-primary">
+                                                        <i class="fas fa-arrow-up me-1"></i> Upgrade to Corporate
+                                                    </a>
+                                                    <div class="alert alert-info small">
+                                                        <i class="fas fa-info-circle me-1"></i> You can cancel your subscription and resubscribe to a lower tier later.
+                                                    </div>
+                                                </div>
+                                            {% elif premium_status == 2 %}
+                                                <div class="alert alert-info">
+                                                    <i class="fas fa-info-circle me-1"></i> You can cancel your subscription and resubscribe to a lower tier later.
+                                                </div>
+                                            {% endif %}
+                                            
+                                            {% if premium_status > 0 %}
+                                                <form action="/cancel-subscription" method="POST" onsubmit="return confirm('Are you sure you want to cancel your subscription? You will lose access to premium features at the end of your billing period.');">
+                                                    <button type="submit" class="btn btn-danger w-100">
+                                                        <i class="fas fa-times-circle me-2"></i> Cancel Subscription
+                                                    </button>
+                                                </form>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ request.url_for('static', path='js/account.js') }}"></script>
+{% endblock %}

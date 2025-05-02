@@ -1,0 +1,27 @@
+.thumbnail-card {
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+    border: 2px solid transparent;
+}
+
+.thumbnail-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.thumbnail-card.border-primary {
+    background-color: rgba(0, 102, 204, 0.05);
+}
+
+.thumbnail-card .form-check {
+    cursor: pointer;
+}
+
+.thumbnail-card img {
+    object-fit: cover;
+    height: 120px;
+}
+
+#loadingOverlay {
+    transition: opacity 0.3s;
+}

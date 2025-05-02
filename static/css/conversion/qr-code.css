@@ -1,0 +1,15 @@
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    .card-body img, .card-body img * {
+        visibility: visible;
+    }
+    .card-body img {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: auto;
+    }
+}

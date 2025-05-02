@@ -77,7 +77,7 @@
                                     <li>Download or print the QR code</li>
                                     <li>Include it in your presentation materials</li>
                                     <li>Attendees can scan it with any QR code scanner</li>
-                                    <li>They'll instantly access your selected slides</li>
+                                    <li>They'll instantly access your selected slides as a PDF file</li>
                                 </ol>
                             </div>
                         </div>
@@ -94,21 +94,5 @@
     </div>
 </div>
 
-<style>
-    @media print {
-        body * {
-            visibility: hidden;
-        }
-        .card-body img, .card-body img * {
-            visibility: visible;
-        }
-        .card-body img {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: auto;
-        }
-    }
-</style>
+<link rel="stylesheet" href="{{ request.url_for('static', path='css/conversion/qr-code.css') }}">
 {% endblock %}

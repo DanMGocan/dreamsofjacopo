@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request, Depends, HTTPException
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, RedirectResponse
 from core.qr_generator import generate_qr
 from database_op.database import get_db
 import mysql.connector
@@ -43,6 +43,7 @@ async def generate_pdf_qr(
 ):
     """
     Generates a QR code for the entire PDF presentation.
+    The QR code will point to a tracking endpoint that increments the download count.
     """
     cursor = None
     try:
@@ -72,9 +73,12 @@ async def generate_pdf_qr(
             raise HTTPException(status_code=404, detail="User alias not found")
         user_alias = user_data['alias']
 
-        # Generate the QR code
-        # The generate_qr function is expected to return the URL of the generated QR code
-        # and handle the saving to Azure Blob Storage.
+        # Get the PDF URL and SAS token
+        pdf_url = pdf_data['url']
+        sas_token = pdf_data['sas_token']
+        full_pdf_url = f"{pdf_url}?{sas_token}"
+        
+        # Generate the QR code with the direct URL to the PDF
         qr_code_url, qr_code_sas_token, qr_code_sas_token_expiry = generate_qr(
             link_with_sas=full_pdf_url,
             user_alias=user_alias,
@@ -93,6 +97,63 @@ async def generate_pdf_qr(
     except Exception as e:
         print(f"Error generating PDF QR code: {e}")
         raise HTTPException(status_code=500, detail="Error generating QR code")
+    finally:
+        if cursor:
+            cursor.close()
+
+# We'll keep these endpoints for future use, but we won't use them for QR codes directly
+# Instead, we'll track downloads when users access the dashboard
+
+@qrcode.post("/increment-pdf-download/{pdf_id}")
+async def increment_pdf_download(
+    pdf_id: int,
+    request: Request,
+    db: mysql.connector.connection.MySQLConnection = Depends(get_db)
+):
+    """
+    Increments the download count for a PDF presentation.
+    This endpoint can be called via AJAX when a user downloads a PDF.
+    """
+    cursor = None
+    try:
+        # Increment the download count
+        cursor = db.cursor()
+        cursor.execute(
+            "UPDATE pdf SET download_count = download_count + 1 WHERE pdf_id = %s",
+            (pdf_id,)
+        )
+        db.commit()
+        return {"success": True, "message": "Download count incremented"}
+    except Exception as e:
+        print(f"Error incrementing PDF download count: {e}")
+        raise HTTPException(status_code=500, detail="Error tracking download")
+    finally:
+        if cursor:
+            cursor.close()
+
+@qrcode.post("/increment-set-download/{set_id}")
+async def increment_set_download(
+    set_id: int,
+    request: Request,
+    db: mysql.connector.connection.MySQLConnection = Depends(get_db)
+):
+    """
+    Increments the download count for a set.
+    This endpoint can be called via AJAX when a user downloads a set.
+    """
+    cursor = None
+    try:
+        # Increment the download count
+        cursor = db.cursor()
+        cursor.execute(
+            "UPDATE `set` SET download_count = download_count + 1 WHERE set_id = %s",
+            (set_id,)
+        )
+        db.commit()
+        return {"success": True, "message": "Download count incremented"}
+    except Exception as e:
+        print(f"Error incrementing set download count: {e}")
+        raise HTTPException(status_code=500, detail="Error tracking download")
     finally:
         if cursor:
             cursor.close()

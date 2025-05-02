@@ -19,7 +19,7 @@ import mysql.connector
 from mysql.connector import connection
 
 import logging
-import zipfile
+import fitz  # PyMuPDF
 from typing import List, Optional, Dict
 from pydantic import parse_obj_as
 from datetime import datetime, timedelta
@@ -123,36 +123,60 @@ async def upload_pptx(
         user_alias = user_data['alias']
         premium_status = user_data['premium_status']
 
-        # Free users can only have one presentation at a time
-        if premium_status == 0:
-            try:
-                cursor = db.cursor(dictionary=True, buffered=True)
-                cursor.execute("SELECT pdf_id FROM pdf WHERE user_id = %s", (user_id,))
-                existing_pdf = cursor.fetchone()
-                if existing_pdf:
-                    conversion_progress[upload_id]["status"] = "error"
-                    raise HTTPException(
-                        status_code=403, 
-                        detail="Free users can only have one presentation. Please delete your existing presentation before uploading a new one."
-                    )
-            except mysql.connector.Error as db_err:
-                logger.error(f"Database error when checking existing PDFs: {db_err}")
+        # Check presentation limits based on user status
+        try:
+            cursor = db.cursor(dictionary=True, buffered=True)
+            cursor.execute("SELECT COUNT(*) as count FROM pdf WHERE user_id = %s", (user_id,))
+            result = cursor.fetchone()
+            existing_count = result['count'] if result else 0
+            
+            # Free users can only have one presentation at a time
+            if premium_status == 0 and existing_count >= 1:
                 conversion_progress[upload_id]["status"] = "error"
                 raise HTTPException(
-                    status_code=500,
-                    detail="Database connection error. Please try again later."
+                    status_code=403, 
+                    detail="Free users can only have one presentation. Please delete your existing presentation before uploading a new one."
                 )
-            finally:
-                if cursor:
-                    cursor.close()
-                    cursor = None
+            # Premium users can have up to 3 presentations
+            elif premium_status == 1 and existing_count >= 3:
+                conversion_progress[upload_id]["status"] = "error"
+                raise HTTPException(
+                    status_code=403, 
+                    detail="Premium users can have up to 3 presentations. Please delete an existing presentation before uploading a new one."
+                )
+        except mysql.connector.Error as db_err:
+            logger.error(f"Database error when checking existing PDFs: {db_err}")
+            conversion_progress[upload_id]["status"] = "error"
+            raise HTTPException(
+                status_code=500,
+                detail="Database connection error. Please try again later."
+            )
+        finally:
+            if cursor:
+                cursor.close()
+                cursor = None
 
         # Get the original filename and clean it up for storage
         original_filename = pptx_file.filename
         sanitized_filename = original_filename.replace(" ", "_").replace(".pptx", ".pdf")
 
-        # Get the file size in kilobytes
+        # Get the file size in kilobytes and megabytes
         file_size_kb = round(pptx_file.size / 1024)
+        file_size_mb = round(file_size_kb / 1024, 2)
+        
+        # Check file size against the user's plan limit
+        max_size_mb = 20  # Default for free tier
+        if premium_status == 1:
+            max_size_mb = 30  # Premium tier
+        elif premium_status == 2:
+            max_size_mb = 50  # Corporate tier
+            
+        if file_size_mb > max_size_mb:
+            conversion_progress[upload_id]["status"] = "error"
+            raise HTTPException(
+                status_code=413,
+                detail=f"File size ({file_size_mb} MB) exceeds the maximum allowed for your plan ({max_size_mb} MB). Please upgrade your plan or upload a smaller file."
+            )
 
         # Read the uploaded PowerPoint file
         pptx_bytes = await pptx_file.read()
@@ -277,6 +301,7 @@ async def upload_pptx(
             raise e
         else:
             raise HTTPException(
+
                 status_code=500,
                 detail=f"Failed to upload and process file: {str(e)}"
             )
@@ -525,12 +550,17 @@ def generate_set(
     
     This is the final step in our user flow:
     1. We package up just the slides the user selected
-    2. Create a ZIP file containing those slides
-    3. Generate a QR code that links to the ZIP file
+    2. Create a PDF file containing those slides
+    3. Generate a QR code that links to the PDF file
     4. Save everything to the database so it appears on the dashboard
     
     When someone scans the QR code, they'll get immediate access to just
-    the slides the presenter wanted to share.
+    the slides the presenter wanted to share as a PDF file.
+    
+    Set limits based on premium status:
+    - Free tier: 3 sets per presentation
+    - Premium tier: 5 sets per presentation
+    - Corporate tier: 8 sets per presentation
     """
     logging.info("Starting to generate a new slide set")
     cursor = None
@@ -539,6 +569,35 @@ def generate_set(
     if 'user_id' not in request.session:
         logging.warning("User not logged in, redirecting to login page")
         return RedirectResponse(url="/login", status_code=303)
+    
+    # Get user's premium status
+    user_id = request.session['user_id']
+    premium_status = request.session.get('premium_status', 0)
+    
+    # Check if the user has reached their set limit
+    cursor = db.cursor(dictionary=True)
+    cursor.execute("SELECT COUNT(*) as count FROM `set` WHERE pdf_id = %s", (pdf_id,))
+    set_count = cursor.fetchone()['count']
+    cursor.close()
+    
+    # Determine max sets based on premium status
+    max_sets = 3  # Free tier
+    if premium_status == 1:
+        max_sets = 5  # Premium tier
+    elif premium_status == 2:
+        max_sets = 8  # Corporate tier
+    
+    if set_count >= max_sets:
+        # User has reached their set limit
+        tier_name = "Free"
+        if premium_status == 1:
+            tier_name = "Premium"
+        elif premium_status == 2:
+            tier_name = "Corporate"
+            
+        response = RedirectResponse(url=f"/select-slides/{pdf_id}", status_code=303)
+        set_flash_message(response, f"You have reached the maximum number of sets ({max_sets}) allowed for your {tier_name} tier. Please delete some sets or upgrade your account.")
+        return response
 
     # Make sure they actually selected some slides
     if not selected_thumbnails:
@@ -622,59 +681,91 @@ def generate_set(
         conversion_progress[str_pdf_id]["current"] = 0
         conversion_progress[str_pdf_id]["status"] = "processing"
 
-        # Step 2: Create a ZIP file with all the selected slides
-        logging.info("Packaging slides into a ZIP file")
-        zip_buffer = io.BytesIO()
-        with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
-            for idx, image in enumerate(images):
-                try:
-                    # Get the full URL with security token
-                    image_url = f"{image['url']}?{image['sas_token']}"
-                    
-                    # Download the image from Azure
-                    blob_client = BlobClient.from_blob_url(image_url)
-                    downloader = blob_client.download_blob(timeout=30)
-                    blob_data = downloader.readall()
+        # Step 2: Create a PDF file with all the selected slides
+        logging.info("Packaging slides into a PDF file")
+        pdf_buffer = io.BytesIO()
+        pdf_document = fitz.open()  # Create a new empty PDF
 
-                    # Add it to our ZIP file with a nice filename
-                    # We use the original filename but add a slide number prefix
-                    filename = f"slide_{idx+1}_{os.path.basename(image['url'])}"
-                    zip_file.writestr(filename, blob_data)
-                    
-                    # Update progress (using 1-based indexing for better user display)
-                    conversion_progress[str_pdf_id]["current"] = idx + 1
-                    
-                except Exception as e:
-                    logging.error(f"Problem with slide {idx+1}: {e}")
-                    conversion_progress[str_pdf_id]["status"] = "error"
-                    raise Exception(f"Could not process one of your selected slides. Please try again.")
+        for idx, image in enumerate(images):
+            try:
+                # Get the full URL with security token
+                image_url = f"{image['url']}?{image['sas_token']}"
+                
+                # Download the image from Azure
+                blob_client = BlobClient.from_blob_url(image_url)
+                downloader = blob_client.download_blob(timeout=30)
+                blob_data = downloader.readall()
 
-        # Reset the buffer position so we can read from the beginning
-        zip_buffer.seek(0)
+                # Create a temporary image file in memory
+                img_stream = io.BytesIO(blob_data)
+                
+                # Add the image as a new page to the PDF
+                # Create a new page with appropriate dimensions
+                img = fitz.open(stream=img_stream, filetype="png")
+                rect = img[0].rect  # Get the rectangle representing the image size
+                page = pdf_document.new_page(width=rect.width, height=rect.height)
+                
+                # Insert the image onto the page
+                page.insert_image(rect, stream=blob_data)
+                img.close()
+                
+                # Update progress (using 1-based indexing for better user display)
+                conversion_progress[str_pdf_id]["current"] = idx + 1
+                
+            except Exception as e:
+                logging.error(f"Problem with slide {idx+1}: {e}")
+                conversion_progress[str_pdf_id]["status"] = "error"
+                raise Exception(f"Could not process one of your selected slides. Please try again.")
 
-        # Step 3: Upload the ZIP file to Azure
+        # Save the PDF to the buffer
+        pdf_document.save(pdf_buffer)
+        pdf_document.close()
+        pdf_buffer.seek(0)
+
+        # Step 3: Upload the PDF file to Azure
         # We include a timestamp to make the filename unique
         timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
-        zip_filename = f"{set_name}_{timestamp}.zip"
-        zip_blob_path = f"{user_alias}/sets/{pdf_id}/{zip_filename}"
+        pdf_filename = f"{set_name}_{timestamp}.pdf"
+        pdf_blob_path = f"{user_alias}/sets/{pdf_id}/{pdf_filename}"
 
         # Update progress
         conversion_progress[str_pdf_id]["status"] = "uploading"
         
-        zip_content = zip_buffer.getvalue()
-        zip_url, zip_sas_token, zip_sas_token_expiry = upload_to_blob(
-            blob_name=zip_blob_path,
-            file_content=zip_content,
-            content_type="application/zip",
+        pdf_content = pdf_buffer.getvalue()
+        pdf_url, pdf_sas_token, pdf_sas_token_expiry = upload_to_blob(
+            blob_name=pdf_blob_path,
+            file_content=pdf_content,
+            content_type="application/pdf",
             user_alias=user_alias
         )
         
-        logging.info(f"ZIP file uploaded to {zip_url}")
+        logging.info(f"PDF file uploaded to {pdf_url}")
 
-        # Step 4: Generate a QR code that links to the ZIP file
+        # Step 4: Generate a QR code that links directly to the PDF
         conversion_progress[str_pdf_id]["status"] = "generating_qr"
         
-        link_with_sas = f"{zip_url}?{zip_sas_token}"
+        # Get the set ID (we'll need to insert the record first)
+        cursor = db.cursor()
+        cursor.execute(
+            """
+            INSERT INTO `set`
+            (name, pdf_id, user_id, sas_token, sas_token_expiry, slide_count)
+            VALUES (%s, %s, %s, %s, %s, %s)
+            """,
+            (
+                set_name,
+                pdf_id,
+                user_id,
+                pdf_sas_token,
+                pdf_sas_token_expiry,
+                len(images)  # Store the number of slides in the set
+            )
+        )
+        db.commit()
+        set_id = cursor.lastrowid
+        
+        # Generate the QR code with the direct URL to the PDF
+        link_with_sas = f"{pdf_url}?{pdf_sas_token}"
         qr_code_url, qr_code_sas_token, qr_code_sas_token_expiry = generate_qr(
             link_with_sas=link_with_sas,
             user_alias=user_alias,
@@ -698,26 +789,20 @@ def generate_set(
                     detail="Database connection error. Please try again later."
                 )
 
-        # Step 5: Save everything to the database
+        # Step 5: Update the set record with QR code information
         conversion_progress[str_pdf_id]["status"] = "saving"
         
-        cursor = db.cursor()
         cursor.execute(
             """
-            INSERT INTO `set`
-            (name, pdf_id, qrcode_url, qrcode_sas_token, qrcode_sas_token_expiry, 
-             sas_token, sas_token_expiry, user_id)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            UPDATE `set`
+            SET qrcode_url = %s, qrcode_sas_token = %s, qrcode_sas_token_expiry = %s
+            WHERE set_id = %s
             """,
             (
-                set_name,
-                pdf_id,
                 qr_code_url,
                 qr_code_sas_token,
                 qr_code_sas_token_expiry,
-                zip_sas_token,
-                zip_sas_token_expiry,
-                user_id
+                set_id
             )
         )
         db.commit()
