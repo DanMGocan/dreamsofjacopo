@@ -48,7 +48,7 @@ async def get_stats(request: Request):
         logger.error(f"Error getting system stats: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting system stats: {str(e)}")
 
-@system.get("/bug-reports")
+@system.get("/bug_reports")
 async def get_bug_reports(request: Request, db: mysql.connector.connection.MySQLConnection = Depends(get_db)):
     """
     Get all bug reports with user information.
@@ -86,7 +86,7 @@ async def get_bug_reports(request: Request, db: mysql.connector.connection.MySQL
         logger.error(f"Error getting bug reports: {e}")
         raise HTTPException(status_code=500, detail=f"Error getting bug reports: {str(e)}")
 
-@system.post("/bug-reports/{report_id}/status")
+@system.post("/bug_reports/{report_id}/status")
 async def update_bug_report_status(
     request: Request,
     report_id: int = Path(...),

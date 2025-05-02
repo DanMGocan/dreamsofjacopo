@@ -21,7 +21,7 @@ function updateBugStatus(reportId, newStatus) {
         activeStatusUpdates[reportId] = new AbortController();
         const signal = activeStatusUpdates[reportId].signal;
         
-        fetch(`/api/system/bug-reports/${reportId}/status`, {
+        fetch(`/api/system/bug_reports/${reportId}/status`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
@@ -267,7 +267,7 @@ document.addEventListener('DOMContentLoaded', function() {
         activeFetches.bugReports = new AbortController();
         const signal = activeFetches.bugReports.signal;
         
-        fetch('/api/system/bug-reports', { signal })
+        fetch('/api/system/bug_reports', { signal })
             .then(response => {
                 if (!response.ok) {
                     throw new Error('Network response was not ok');
