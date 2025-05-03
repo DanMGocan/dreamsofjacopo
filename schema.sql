@@ -83,3 +83,12 @@ CREATE INDEX idx_user_id ON pdf(user_id);
 CREATE INDEX idx_pdf_id ON image(pdf_id);
 CREATE INDEX idx_bug_reports_user_id ON bug_reports(user_id);
 CREATE INDEX idx_bug_reports_status ON bug_reports(status);
+
+-- Add columns for premium features to the user table
+ALTER TABLE user
+ADD COLUMN additional_presentations INT DEFAULT 0,
+ADD COLUMN additional_storage_days INT DEFAULT 0,
+ADD COLUMN additional_sets INT DEFAULT 0;
+
+-- Add an index for faster queries on premium_status
+CREATE INDEX idx_premium_status ON user(premium_status);

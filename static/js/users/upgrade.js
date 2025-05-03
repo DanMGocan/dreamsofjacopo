@@ -1,3 +1,5 @@
+/* VERY BUGGY CODE */
+
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('upgradeForm');
     const totalPriceSpan = document.getElementById('totalPrice');

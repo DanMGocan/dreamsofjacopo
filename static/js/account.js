@@ -6,11 +6,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-/**
- * Check if the user is eligible to downgrade to a lower tier
- * @param {number} targetTier - The tier to downgrade to (0 for Free, 1 for Premium)
- * @param {string} tierName - The name of the tier for display purposes
- */
 function checkDowngradeEligibility(targetTier, tierName) {
     // First confirm the user wants to downgrade
     if (confirm(`Are you sure you want to downgrade to ${tierName} tier? This will take effect immediately.`)) {

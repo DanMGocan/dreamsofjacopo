@@ -62,28 +62,6 @@ def initialize_database():
         # Commit the schema creation
         connection.commit()
         print("Schema and tables created successfully!")
-        
-        # Add premium feature columns to the user table
-        premium_columns_sql = """
-        -- Add columns for premium features to the user table
-        ALTER TABLE user
-        ADD COLUMN additional_presentations INT DEFAULT 0,
-        ADD COLUMN additional_storage_days INT DEFAULT 0,
-        ADD COLUMN additional_sets INT DEFAULT 0;
-
-        -- Add an index for faster queries on premium_status
-        CREATE INDEX idx_premium_status ON user(premium_status);
-        """
-        
-        # Split and execute premium columns statements
-        for statement in premium_columns_sql.split(';'):
-            if statement.strip():
-                cursor.execute(statement)
-                print(f"Executed premium column statement: {statement.strip()[:50]}...")
-        
-        # Commit the premium columns addition
-        connection.commit()
-        print("Premium columns added successfully!")
 
         # Now insert the test users
         # Use the same password hashing as the application
@@ -93,7 +71,7 @@ def initialize_database():
         admin_password = 'slidepull'  # Plain text password for the admin account
         admin_hashed_password = bcrypt.hashpw(admin_password.encode('utf-8'), bcrypt.gensalt())
 
-        # Corporate user
+        # Corporate tier user
         corporate_email = 'colm@tud.ie'
         corporate_password = 'tu082'  # Plain text password for the corporate account
         corporate_hashed_password = bcrypt.hashpw(corporate_password.encode('utf-8'), bcrypt.gensalt())

@@ -228,8 +228,7 @@ footer {
 
 #hero-section-text {
     position: relative;
-    padding-top: 100px; /* Increased padding to move text higher */
-    /* Background image moved to pseudo-element for opacity control */
+    padding-top: 100px; 
 }
 
 #hero-section-text::before {
@@ -241,9 +240,9 @@ footer {
     height: 100%;
     background-image: url('/static/media/img/presentation.png');
     background-size: cover;
-    background-position: bottom; /* Position image at the bottom */
-    opacity: 0.15; /* Set transparency to 95% */
-    z-index: -1; /* Place the pseudo-element behind the content */
+    background-position: bottom; 
+    opacity: 0.15; 
+    z-index: -1; 
 }
 
 .card-navy-border {
