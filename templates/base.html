@@ -13,6 +13,9 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
+    <!-- Animate.css for animations -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css">
+    
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ request.url_for('static', path='css/base.css') }}">
 </head>
@@ -32,6 +35,11 @@
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
+                <div class="navbar-stripes me-3">
+                    <div class="stripe"></div>
+                    <div class="stripe"></div>
+                    <div class="stripe"></div>
+                </div>
                 <ul class="navbar-nav ms-auto">
                     {% if 'email' in request.session %}
                     <li class="nav-item">
@@ -63,6 +71,14 @@
                         </a>
                     </li>
                     {% endif %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="/how-it-works">
+                            <i class="fas fa-question-circle me-1"></i> How it Works
+                        </a>
+                    </li>
+                    <li class="nav-item nav-divider">
+                        <span class="nav-divider-line"></span>
+                    </li>
                     <li class="nav-item">
                         <a class="nav-link" href="/login">
                             <i class="fas fa-sign-in-alt me-1"></i> Login

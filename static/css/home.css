@@ -1,18 +1,351 @@
-.feature-icon {
+/* Hero Section Styling */
+.hero-container {
+    position: relative;
+    padding: 3rem 0;
+    overflow: hidden;
+    margin-bottom: 3rem;
+}
+
+.hero-content {
+    position: relative;
+    z-index: 2;
+    align-items: flex-start !important; /* Align items to the top */
+}
+
+.hero-title {
+    font-weight: 700;
+    margin-bottom: 1.5rem;
+    color: var(--primary-color);
+}
+
+.hero-title .highlight {
+    position: relative;
+    display: inline-block;
+}
+
+.hero-title .highlight::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 8px;
+    background-color: var(--accent-color);
+    z-index: -1;
+    transform: translateY(2px);
+}
+
+.video-container h3 {
+    color: var(--primary-color);
+    font-weight: 600;
+}
+
+.shadow-strong {
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2) !important;
+}
+
+.row.align-items-center.hero-content {
+    align-items: center !important;
+}
+
+/* Login buttons row */
+.login-buttons-row {
+    flex-wrap: nowrap;
+}
+
+.login-buttons-row .btn {
+    padding: 0.625rem;
+}
+
+.login-buttons-row .btn-square {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+}
+
+
+/* Login Card Animation */
+.login-card {
+    transform: translateY(0);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    border-radius: 12px;
+    overflow: hidden;
+    height: 550px; /* Increased fixed height for consistent size */
+    display: flex; /* Use flexbox to manage height of children */
+    flex-direction: column; /* Stack card-header and card-body vertically */
+    border: 1px solid var(--primary-color); /* Thin blue border */
+}
+
+.login-card .card-body {
+    flex-grow: 1; /* Allow card-body to take remaining height */
+    display: flex;
+    flex-direction: column;
+}
+
+.login-card .tab-content {
+    flex-grow: 1; /* Allow tab-content to take remaining height */
+    display: flex;
+    flex-direction: column; /* Ensure tab-content itself is a flex container */
+}
+
+.login-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 20px 40px rgba(0, 48, 143, 0.25) !important;
+}
+
+/* Social Login Buttons */
+.social-login-container {
+    gap: 10px;
+}
+
+.btn-google, .btn-linkedin, .btn-apple {
+    width: 50px;
+    height: 50px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
+    color: white;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
 }
 
-#features {
-    scroll-margin-top: 80px;
+.btn-square {
+    border-radius: 8px !important;
 }
 
-#login {
-    scroll-margin-top: 80px;
+.btn-google {
+    background-color: #0D652D; /* Google green */
+}
+
+.btn-linkedin {
+    background-color: #0077B5; /* LinkedIn blue */
+}
+
+.btn-apple {
+    background-color: #000000; /* Apple black */
+}
+
+.btn-google:hover, .btn-linkedin:hover, .btn-apple:hover {
+    transform: translateY(-3px);
+    color: white;
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn-google:hover {
+    background-color: #E64A19; /* Darker Google orange */
+}
+
+.btn-linkedin:hover {
+    background-color: #006699; /* Darker LinkedIn blue */
+}
+
+.btn-apple:hover {
+    background-color: #333333; /* Slightly lighter black for hover effect */
+}
+
+/* Login Pane Alignment */
+#login-pane, #register-pane {
+    margin-bottom: 0; /* Adjusted for alignment */
+    height: 100%; /* Ensure tab panes take full height of their container */
+}
+
+#login-pane form,
+#register-pane form {
+    height: 100%; /* Make forms take full height of tab pane */
+    display: flex;
+    flex-direction: column;
+}
+
+#login-pane form .login-buttons-row {
+    margin-top: auto; /* Push login buttons to the bottom */
+}
+
+#register-pane form .d-grid {
+    margin-top: auto; /* Push register button to the bottom */
+}
+
+/* Form Animation */
+.form-group-animated label {
+    transition: color 0.3s ease;
+}
+
+.form-group-animated input:focus + label,
+.form-group-animated .input-group:focus-within + label {
+    color: var(--primary-color);
+}
+
+.form-group-animated .input-group {
+    transition: transform 0.3s ease;
+}
+
+.form-group-animated .input-group:focus-within {
+    transform: translateX(5px);
+}
+
+/* Pulse Button Animation */
+.pulse-button {
+    position: relative;
+    box-shadow: 0 0 0 0 rgba(0, 48, 143, 0.7);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% {
+        box-shadow: 0 0 0 0 rgba(0, 48, 143, 0.7);
+    }
+    70% {
+        box-shadow: 0 0 0 10px rgba(0, 48, 143, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(0, 48, 143, 0);
+    }
+}
+
+/* How It Works Section */
+.how-it-works-section {
+    padding: 4rem 0;
+    background-color: var(--light-gray);
+    border-radius: 20px;
+    margin: 3rem 0;
+}
+
+.how-it-works-section h2 {
+    text-align: left; /* Align title to the top/left */
+}
+
+.process-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.process-step {
+    text-align: center;
+    padding: 1.5rem;
+    background-color: var(--secondary-color);
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    position: relative; /* Needed for pseudo-element positioning */
+    overflow: hidden; /* Hide overflowing pseudo-element corners */
+    flex: 1 1 200px; /* Allow items to grow/shrink and set a base width */
+    border: 1px solid var(--primary-color); /* Thin blue border */
+}
+
+.process-step::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 5px; /* Blue line thickness */
+    background-color: var(--primary-color);
+    z-index: 1; /* Ensure it's above content if needed */
+}
+
+.process-step.video-tile::before {
+    display: none; /* Remove top border for video tile */
+}
+
+.process-step.video-tile {
+    background-color: red;
+    color: white;
+    border: none; /* Remove all borders for video tile */
+}
+
+.process-step.video-tile a.video-link {
+    text-decoration: none;
+    color: white !important; /* Ensure link text is white */
+}
+
+.process-step.video-tile .process-icon {
+    background-color: white;
+    color: red; /* Icon color inverse */
+}
+
+
+.process-step:hover {
+    transform: translateY(-5px);
+    box-shadow: 8px 20px rgba(0, 48, 143, 0.15);
+}
+
+.process-icon {
+    width: 70px;
+    height: 70px;
+    background-color: var(--primary-color);
+    color: var(--secondary-color);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1rem;
+    font-size: 1.75rem;
+    transition: transform 0.3s ease;
+}
+
+.process-step:hover .process-icon {
+    transform: rotate(10deg);
+}
+
+.process-arrow {
+    color: var(--primary-color);
+    font-size: 1.5rem;
+    display: flex;
+    align-items: center;
+    animation: arrow-pulse 1.5s infinite;
+}
+
+/* Grid Layout for Sections */
+.process-grid-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px; /* Adjust gap as needed */
+    justify-content: center; /* Center items in the flex container */
+}
+
+
+/* QR Code Animation */
+.qr-animate {
+    animation: qr-scan 3s infinite;
+}
+
+@keyframes qr-scan {
+    0% {
+        background: linear-gradient(to bottom, transparent 0%, transparent 100%);
+        background-size: 100% 0%;
+        background-repeat: no-repeat;
+    }
+    50% {
+        background: linear-gradient(to bottom, rgba(173, 216, 230, 0.7) 0%, rgba(173, 216, 230, 0) 100%);
+        background-size: 100% 100%;
+        background-repeat: no-repeat;
+    }
+    100% {
+        background: linear-gradient(to bottom, transparent 0%, transparent 100%);
+        background-size: 100% 0%;
+        background-repeat: no-repeat;
+    }
+}
+
+@media (max-width: 768px) {
+    .hero-title {
+        font-size: 2.5rem;
+    }
 }
 
 /* Ensure consistent tab pane height */
 .tab-pane {
     min-height: 320px;
+}
+
+/* Container for How It Works Section */
+.sections-container {
+    margin: 0 auto; /* Center the container */
+    max-width: 1000px; /* Limit the width for centering, adjust as needed */
+    padding: 0 15px; /* Add some padding on the sides */
 }

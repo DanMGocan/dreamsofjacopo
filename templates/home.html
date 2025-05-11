@@ -3,119 +3,114 @@
 {% block title %}Home | SlidePull{% endblock %}
 
 {% block content %}
-<div class="row align-items-center">
-    <!-- Hero Section -->
-    <div class="col-lg-6 mb-5 mb-lg-0" id="hero-section-text">
-        <h1 class="display-4 fw-bold mb-3">Share Your Slides Instantly</h1>
-        <p class="lead mb-4">
-            SlidePull converts your PowerPoint presentations into shareable slides with QR codes. 
-            Perfect for teachers, presenters, and professionals who want to share content effortlessly.
-        </p>
-        <p class="mb-4">
-            With SlidePull, you can upload your presentations, select specific slides to share, and generate 
-            QR codes that give your audience instant access to your content. No more emailing large files or 
-            dealing with compatibility issues. Just scan and view!
-        </p>
-        <p class="mb-4">
-            Our platform is designed for simplicity and efficiency. Your presentations are securely stored, 
-            and you have complete control over which slides are shared and for how long.
-        </p>
-        <div class="d-flex flex-wrap gap-2">
-            <a href="/how-it-works" class="btn btn-primary btn-lg">
-                <i class="fas fa-question-circle me-2"></i> How it works?
-            </a>
-        </div>
-    </div>
+<!-- Hero Section -->
+<div class="hero-container">
     
-    <!-- Login Section -->
-    <div class="col-lg-5 offset-lg-1">
-        <div class="card shadow-sm" id="login">
-            <div class="card-header bg-white">
-                <h2 class="h4 mb-0 section-title text-center">
-                    <i class="fas fa-user me-2"></i> Account Access
-                </h2>
-            </div>
-            <div class="card-body p-4">
-                <ul class="nav nav-tabs mb-4" id="authTabs" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="login-tab" data-bs-toggle="tab" data-bs-target="#login-pane" type="button" role="tab" aria-controls="login-pane" aria-selected="true">Login</button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="register-tab" data-bs-toggle="tab" data-bs-target="#register-pane" type="button" role="tab" aria-controls="register-pane" aria-selected="false">Register</button>
-                    </li>
-                </ul>
-                
-                <div class="tab-content" id="authTabsContent">
-                    <!-- Login Form -->
-                    <div class="tab-pane fade show active" id="login-pane" role="tabpanel" aria-labelledby="login-tab">
-                        <form action="/login" method="post" class="mb-3">
-                            <div class="mb-3">
-                                <label for="email" class="form-label">Email:</label>
-                                <div class="input-group">
-                                    <span class="input-group-text"><i class="fas fa-envelope"></i></span>
-                                    <input type="email" name="email" id="email" class="form-control" placeholder="Enter your email" required>
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <label for="password" class="form-label">Password:</label>
-                                <div class="input-group">
-                                    <span class="input-group-text"><i class="fas fa-lock"></i></span>
-                                    <input type="password" name="password" id="password" class="form-control" placeholder="Enter your password" required>
-                                </div>
-                                <div class="form-text text-end">
-                                    <a href="/forgot-password" class="text-decoration-none">Forgot password?</a>
-                                </div>
-                            </div>
-                            <div class="d-grid gap-2">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-sign-in-alt me-2"></i> Login
-                                </button>
-                                <a href="/login/google" class="btn btn-primary">
-                                    <i class="fab fa-google me-2"></i> Google
-                                </a>
-                                <a href="#" class="btn btn-primary social-login" data-provider="linkedin">
-                                    <i class="fab fa-linkedin me-2"></i> LinkedIn
-                                </a>
-                            </div>
-                        </form>
-                    </div>
+    <div class="row align-items-start hero-content">
+        <div class="col-lg-7 mb-5 mb-lg-0">
+            <h1 class="display-4 fw-bold mb-3 hero-title">You bring the <span class="highlight">presentations</span>, we do the rest!</h1>
+            <p class="lead mb-4 hero-subtitle">
+                SlidePull makes sharing your slides as simple as scanning a QR code.
+                Perfect for teachers, presenters, and professionals who want to engage their audience.
+                Say goodbye to bulky email attachments and compatibility issues. With SlidePull,
+                your audience gets instant access to your content, anytime, anywhere, just by scanning a QR code.
+            </p>
+        </div>
+        
+        <!-- Login Card with Animation -->
+        <div class="col-lg-5">
+            <div class="card shadow-strong login-card" id="login">
+                <div class="card-header bg-white">
+                    <h2 class="h4 mb-0 section-title text-center">
+                        <i class="fas fa-user-circle me-2"></i> Join the Experience
+                    </h2>
+                </div>
+                <div class="card-body p-4">
+                    <ul class="nav nav-tabs mb-4" id="authTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="login-tab" data-bs-toggle="tab" data-bs-target="#login-pane" type="button" role="tab" aria-controls="login-pane" aria-selected="true">Login</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="register-tab" data-bs-toggle="tab" data-bs-target="#register-pane" type="button" role="tab" aria-controls="register-pane" aria-selected="false">Register</button>
+                        </li>
+                    </ul>
                     
-                    <!-- Registration Form -->
-                    <div class="tab-pane fade" id="register-pane" role="tabpanel" aria-labelledby="register-tab">
-                        <form action="/create-account" method="post" id="registrationForm">
-                            <div class="mb-3">
-                                <label for="reg-email" class="form-label">Email:</label>
-                                <div class="input-group">
-                                    <span class="input-group-text"><i class="fas fa-envelope"></i></span>
-                                    <input type="email" name="email" id="reg-email" class="form-control" placeholder="Enter your email" required>
+                    <div class="tab-content" id="authTabsContent">
+                        <!-- Login Form -->
+                        <div class="tab-pane fade show active" id="login-pane" role="tabpanel" aria-labelledby="login-tab">
+                            <form action="/login" method="post" class="mb-3">
+                                <div class="mb-3 form-group-animated">
+                                    <label for="email" class="form-label">Email:</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                                        <input type="email" name="email" id="email" class="form-control" placeholder="Enter your email" required>
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="mb-3">
-                                <label for="reg-password" class="form-label">Password:</label>
-                                <div class="input-group">
-                                    <span class="input-group-text"><i class="fas fa-lock"></i></span>
-                                    <input type="password" name="password" id="reg-password" class="form-control" placeholder="Create a password" required>
+                                <div class="mb-3 form-group-animated">
+                                    <label for="password" class="form-label">Password:</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                                        <input type="password" name="password" id="password" class="form-control" placeholder="Enter your password" required>
+                                    </div>
+                                    <div class="form-text text-end">
+                                        <a href="/forgot-password" class="text-decoration-none">Forgot password?</a>
+                                    </div>
                                 </div>
-                                <div class="form-text">
-                                    Password must be at least 8 characters long.
+                                
+                                <div class="d-flex justify-content-between align-items-center mb-3 login-buttons-row">
+                                    <button type="submit" class="btn btn-primary flex-grow-1">
+                                        <i class="fas fa-sign-in-alt me-2"></i> Login
+                                    </button>
+                                    <a href="/login/google" class="btn btn-google btn-square ms-2">
+                                        <i class="fab fa-google"></i>
+                                    </a>
+                                    <a href="#" class="btn btn-linkedin btn-square social-login ms-2" data-provider="linkedin">
+                                        <i class="fab fa-linkedin-in"></i>
+                                    </a>
+                                    <a href="#" class="btn btn-apple btn-square social-login ms-2" data-provider="apple">
+                                        <i class="fab fa-apple"></i>
+                                    </a>
                                 </div>
-                            </div>
-                            <div class="mb-3">
-                                <label for="confirm-password" class="form-label">Confirm Password:</label>
-                                <div class="input-group">
-                                    <span class="input-group-text"><i class="fas fa-lock"></i></span>
-                                    <input type="password" name="confirm_password" id="confirm-password" class="form-control" placeholder="Confirm your password" required>
+                            </form>
+                        </div>
+
+                        <!-- Registration Form -->
+                        <div class="tab-pane fade" id="register-pane" role="tabpanel" aria-labelledby="register-tab">
+                            <form action="/create-account" method="post" id="registrationForm">
+                                <div class="mb-3 form-group-animated">
+                                    <label for="reg-email" class="form-label">Email:</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-envelope"></i></span>
+                                        <input type="email" name="email" id="reg-email" class="form-control" placeholder="Enter your email" required>
+                                    </div>
                                 </div>
-                            </div>
-                            <div class="mb-3">
-                                <div id="password-mismatch-error" class="text-danger" style="display: none;">Passwords do not match.</div>
-                            </div>
-                            <div class="d-grid">
-                                <button type="submit" class="btn btn-primary">
-                                    <i class="fas fa-user-plus me-2"></i> Create Account
-                                </button>
-                            </div>
-                        </form>
+                                <div class="mb-3 form-group-animated">
+                                    <label for="reg-password" class="form-label">Password:</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                                        <input type="password" name="password" id="reg-password" class="form-control" placeholder="Create a password" required>
+                                    </div>
+                                    <div class="form-text">
+                                        Password must be at least 8 characters long.
+                                    </div>
+                                </div>
+                                <div class="mb-3 form-group-animated">
+                                    <label for="confirm-password" class="form-label">Confirm Password:</label>
+                                    <div class="input-group">
+                                        <span class="input-group-text"><i class="fas fa-lock"></i></span>
+                                        <input type="password" name="confirm_password" id="confirm-password" class="form-control" placeholder="Confirm your password" required>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <div id="password-mismatch-error" class="text-danger" style="display: none;">Passwords do not match.</div>
+                                </div>
+                                <div class="d-grid">
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-user-plus me-2"></i> Create Account
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -123,50 +118,54 @@
     </div>
 </div>
 
-<!-- Features Section -->
-<div class="row mt-5 pt-5" id="features">
-    <div class="col-md-4 mb-4">
-        <div class="card h-100 border-0 shadow-sm">
-            <div class="card-body text-center p-4">
-                <div class="feature-icon bg-primary bg-opacity-10 text-primary p-3 rounded-circle mb-3 mx-auto" style="width: 65px; height: 65px;">
-                    <i class="fas fa-bolt fa-2x"></i>
+<!-- How It Works Section -->
+<div class="how-it-works-section">
+    <h2 class="text-center mb-5">How SlidePull Works</h2>
+    <div class="process-grid-container">
+        <!-- YouTube Video Tile -->
+        <div class="process-step video-tile">
+            <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ&ab_channel=RickAstley" target="_blank" class="video-link">
+                 <div class="process-icon">
+                    <i class="fab fa-youtube"></i>
                 </div>
-                <h3 class="h4 mb-3">Quick Conversion</h3>
-                <p class="text-muted mb-0">
-                    Upload your PowerPoint and get it converted to shareable slides in seconds.
-                </p>
-            </div>
+                <h3>Video Tutorial</h3>
+                <p>Watch a quick video to see how it works!</p>
+                <!-- Placeholder for YouTube video iframe -->
+                <div class="video-placeholder"></div>
+            </a>
         </div>
-    </div>
-    
-    <div class="col-md-4 mb-4">
-        <div class="card h-100 border-0 shadow-sm">
-            <div class="card-body text-center p-4">
-                <div class="feature-icon bg-primary bg-opacity-10 text-primary p-3 rounded-circle mb-3 mx-auto" style="width: 65px; height: 65px;">
-                    <i class="fas fa-qrcode fa-2x"></i>
-                </div>
-                <h3 class="h4 mb-3">QR Code Sharing</h3>
-                <p class="text-muted mb-0">
-                    Generate QR codes that give instant access to your slides without any downloads.
-                </p>
+        <div class="process-step">
+            <div class="process-icon">
+                <i class="fas fa-file-upload"></i>
             </div>
+            <h3>Upload</h3>
+            <p>Upload your PowerPoint presentation to our secure platform</p>
         </div>
-    </div>
-    
-    <div class="col-md-4 mb-4">
-        <div class="card h-100 border-0 shadow-sm">
-            <div class="card-body text-center p-4">
-                <div class="feature-icon bg-primary bg-opacity-10 text-primary p-3 rounded-circle mb-3 mx-auto" style="width: 65px; height: 65px;">
-                    <i class="fas fa-lock fa-2x"></i>
-                </div>
-                <h3 class="h4 mb-3">Secure Storage</h3>
-                <p class="text-muted mb-0">
-                    Your presentations are securely stored in the cloud with controlled access.
-                </p>
+        <div class="process-step">
+            <div class="process-icon">
+                <i class="fas fa-edit"></i>
             </div>
+            <h3>Select</h3>
+            <p>Choose which slides you want to share with your audience</p>
+        </div>
+        <div class="process-step">
+            <div class="process-icon">
+                <i class="fas fa-qrcode qr-animate"></i>
+            </div>
+            <h3>Generate</h3>
+            <p>Create QR codes that link directly to your selected slides</p>
+        </div>
+        <div class="process-step">
+            <div class="process-icon">
+                <i class="fas fa-share-alt"></i>
+            </div>
+            <h3>Share</h3>
+            <p>Your audience scans the QR code to instantly view your slides</p>
         </div>
     </div>
 </div>
+
+<link rel="stylesheet" href="{{ request.url_for('static', path='css/home.css') }}">
 
 <link rel="stylesheet" href="{{ request.url_for('static', path='css/home.css') }}">
 
