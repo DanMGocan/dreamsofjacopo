@@ -9,9 +9,32 @@ import socket
 # Load environment variables from the .env file
 load_dotenv()
 
-GMAIL_USER = os.getenv('GMAIL_USER')
-GMAIL_PASSWORD = os.getenv('GMAIL_PASSWORD')
+# Load environment variables from the .env file
+load_dotenv()
+
+# Use generic SMTP credentials
+SMTP_USER = os.getenv('SMTP_USER')
+SMTP_PASSWORD = os.getenv('SMTP_PASSWORD')
 BASE_URL = os.getenv('BASE_URL', 'http://localhost:8000')
+
+# Configure SMTP settings based on environment variables or default to ZohoMail
+EMAIL_PROVIDER = os.getenv('EMAIL_PROVIDER', 'zoho').lower()
+
+SMTP_SETTINGS = {
+    'zoho': {
+        'server': 'smtppro.zoho.eu',
+        'port': 587,
+        'use_tls': True,
+        'use_ssl': False
+    },
+    # Add other providers here if needed in the future
+    # 'gmail': {
+    #     'server': 'smtp.gmail.com',
+    #     'port': 587,
+    #     'use_tls': True,
+    #     'use_ssl': False
+    # }
+}
 
 def send_activation_email(email_to, token):
     try:
@@ -20,9 +43,20 @@ def send_activation_email(email_to, token):
             token = str(token)
             
         # Check if credentials are configured
-        if not GMAIL_USER or not GMAIL_PASSWORD:
-            print("Error: Gmail credentials (GMAIL_USER or GMAIL_PASSWORD) not configured in .env.")
+        if not SMTP_USER or not SMTP_PASSWORD:
+            print("Error: SMTP credentials (SMTP_USER or SMTP_PASSWORD) not configured in .env.")
             return
+
+        # Get SMTP settings for the selected provider
+        settings = SMTP_SETTINGS.get(EMAIL_PROVIDER)
+        if not settings:
+            print(f"Error: Email provider '{EMAIL_PROVIDER}' not supported.")
+            return
+
+        smtp_server = settings['server']
+        smtp_port = settings['port']
+        use_tls = settings['use_tls']
+        use_ssl = settings['use_ssl']
 
         # Generate the activation link
         activation_link = f"{BASE_URL}/activate-account/{token}"
@@ -31,7 +65,7 @@ def send_activation_email(email_to, token):
         # Create a multipart message
         msg = MIMEMultipart('alternative')
         msg['Subject'] = Header(subject, 'utf-8')
-        msg['From'] = Header(GMAIL_USER, 'utf-8')
+        msg['From'] = Header(SMTP_USER, 'utf-8')
         msg['To'] = Header(email_to, 'utf-8')
         
         # Create HTML content - using simple HTML to avoid encoding issues
@@ -69,32 +103,38 @@ def send_activation_email(email_to, token):
         # Set a longer timeout for the connection
         socket.setdefaulttimeout(30)  # 30 seconds timeout
 
-        # First attempt: Try using port 587 with STARTTLS (works better in some network environments)
-        try:
-            print("Attempting to connect to Gmail SMTP server using port 587 with STARTTLS...")
-            with smtplib.SMTP('smtp.gmail.com', 587, timeout=30) as server:
+        # Connect to the SMTP server
+        if use_ssl:
+            print(f"Attempting to connect to {smtp_server} using port {smtp_port} with SSL...")
+            with smtplib.SMTP_SSL(smtp_server, smtp_port, timeout=30) as server:
+                server.login(SMTP_USER, SMTP_PASSWORD)
+                server.sendmail(SMTP_USER, email_to, msg.as_string())
+                print(f"Activation email sent to {email_to} via {EMAIL_PROVIDER} (port {smtp_port}, SSL).")
+        elif use_tls:
+            print(f"Attempting to connect to {smtp_server} using port {smtp_port} with STARTTLS...")
+            with smtplib.SMTP(smtp_server, smtp_port, timeout=30) as server:
                 server.ehlo()
                 server.starttls()
                 server.ehlo()
-                server.login(GMAIL_USER, GMAIL_PASSWORD)
-                server.sendmail(GMAIL_USER, email_to, msg.as_string())
-                print(f"Activation email sent to {email_to} via Gmail (port 587).")
-                return
-        except Exception as e:
-            print(f"Failed to send email using port 587: {e}")
-            # If port 587 fails, try port 465 with SSL
-            
-        # Second attempt: Try using port 465 with SSL (traditional secure method)
-        print("Attempting to connect to Gmail SMTP server using port 465 with SSL...")
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=30) as server:
-            server.login(GMAIL_USER, GMAIL_PASSWORD)
-            server.sendmail(GMAIL_USER, email_to, msg.as_string())
-            print(f"Activation email sent to {email_to} via Gmail (port 465).")
+                server.login(SMTP_USER, SMTP_PASSWORD)
+                server.sendmail(SMTP_USER, email_to, msg.as_string())
+                print(f"Activation email sent to {email_to} via {EMAIL_PROVIDER} (port {smtp_port}, STARTTLS).")
+        else:
+            print(f"Attempting to connect to {smtp_server} using port {smtp_port} (no encryption)...")
+            with smtplib.SMTP(smtp_server, smtp_port, timeout=30) as server:
+                server.login(SMTP_USER, SMTP_PASSWORD)
+                server.sendmail(SMTP_USER, email_to, msg.as_string())
+                print(f"Activation email sent to {email_to} via {EMAIL_PROVIDER} (port {smtp_port}, no encryption).")
 
     except UnicodeError as e:
         print(f"Unicode encoding error: {e}")
         print("This might be caused by non-UTF-8 characters in the token or email addresses.")
         
     except Exception as e:
-        print(f"Error sending activation email via Gmail: {e}")
-        print("Please check your network/firewall settings and Gmail account configuration.")
+        print(f"Error sending activation email via {EMAIL_PROVIDER}: {e}")
+        print("Please check your network/firewall settings and email account configuration.")
+
+# Note: You will need to update your .env file with your ZohoMail credentials:
+# SMTP_USER=your_zoho_email@yourdomain.com
+# SMTP_PASSWORD=your_zoho_app_password_or_password
+# EMAIL_PROVIDER=zoho
