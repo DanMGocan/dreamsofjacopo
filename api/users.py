@@ -331,8 +331,8 @@ async def show_upgrade_page(
         "next_billing_date": next_billing_date
     })
 
-# Activation endpoint
-@users.get("/activate-account/{token}")
+# Activation endpoint (handles both GET and POST)
+@users.api_route("/activate-account/{token}", methods=["GET", "POST"])
 async def activate_account(
     request: Request, 
     token: str,

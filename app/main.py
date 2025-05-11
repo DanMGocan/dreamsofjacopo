@@ -16,8 +16,8 @@ import os
 from api import converter, users, qrcode, system, feedback
 from core.main_converter import conversion_progress as pdf_conversion_progress
 
-# Create an instance of FastAPI
-app = FastAPI()
+# Create an instance of FastAPI with custom 404 handler
+app = FastAPI(docs_url=None, redoc_url=None)
 
 # Custom exception handlers
 @app.exception_handler(HTTPException)
@@ -31,6 +31,10 @@ async def http_exception_handler(request, exc):
         response = RedirectResponse(url="/dashboard", status_code=303)
         set_flash_message(response, exc.detail)
         return response
+    
+    # Handle 404 errors with our custom template
+    if exc.status_code == 404:
+        return templates.TemplateResponse("404.html", {"request": request}, status_code=404)
     
     # For other HTTP exceptions, use the default handler
     return JSONResponse(
@@ -59,6 +63,11 @@ app.include_router(feedback.feedback) # Include the feedback router
 # Initialize templates
 templates = Jinja2Templates(directory="templates")
 
+# Override default 404 handler
+@app.exception_handler(404)
+async def custom_404_handler(request: Request, exc: HTTPException):
+    return templates.TemplateResponse("404.html", {"request": request}, status_code=404)
+
 # Admin emails for access control
 ADMIN_EMAILS = ["admin@slidepull.net", "colm@tud.ie"]
 
@@ -77,6 +86,21 @@ async def home(request: Request):
 async def how_it_works(request: Request):
     # Show the "How it works?" page
     return templates.TemplateResponse("how_it_works.html", {"request": request})
+
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy_policy(request: Request):
+    # Show the Privacy Policy page
+    return templates.TemplateResponse("privacy.html", {"request": request})
+
+@app.get("/terms", response_class=HTMLResponse)
+async def terms_of_service(request: Request):
+    # Show the Terms of Service page
+    return templates.TemplateResponse("terms.html", {"request": request})
+
+@app.get("/about", response_class=HTMLResponse)
+async def about_page(request: Request):
+    # Show the About page
+    return templates.TemplateResponse("about.html", {"request": request})
 
 @app.get("/account", response_class=HTMLResponse)
 async def account_page(request: Request, db: mysql.connector.connection.MySQLConnection = Depends(get_db)):
