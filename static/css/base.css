@@ -280,7 +280,7 @@ footer {
 }
 
 .container-border {
-    border: 1px solid var(--primary-color); /* Thin blue border */
+    border: 2px solid var(--primary-color); /* Thin blue border */
 }
 
 .row.g-4 .col .card {
