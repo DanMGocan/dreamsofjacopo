@@ -349,3 +349,54 @@
     max-width: 1000px; /* Limit the width for centering, adjust as needed */
     padding: 0 15px; /* Add some padding on the sides */
 }
+
+/* Social buttons */
+.btn-social {
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    transition: all 0.3s ease;
+}
+
+.btn-social:hover {
+    transform: scale(1.05);
+    opacity: 0.9;
+}
+
+.btn-facebook {
+    background-color: #3b5998;
+}
+
+.btn-linkedin {
+    background-color: #0077b5;
+}
+
+.btn-reddit {
+    background-color: #ff4500;
+}
+
+a {
+    text-decoration: none;
+    color: var(--primary-color);
+}
+
+.nav-link {
+    color: var(--primary-color);
+}
+
+@media (max-width: 768px) {
+    .hero-container {
+        margin-bottom: 1.5rem;
+    }
+
+    .how-it-works-section {
+        margin: 1.5rem 0;
+    }
+}

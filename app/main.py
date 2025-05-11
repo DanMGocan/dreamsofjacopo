@@ -1,3 +1,4 @@
+import logging
 from fastapi import FastAPI, UploadFile, File, Form, Request, Depends, WebSocket, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -15,6 +16,14 @@ load_dotenv()
 import os
 from api import converter, users, qrcode, system, feedback
 from core.main_converter import conversion_progress as pdf_conversion_progress
+
+# Configure logging
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    handlers=[
+                        logging.FileHandler("server.log"),
+                        logging.StreamHandler()
+                    ])
 
 # Create an instance of FastAPI with custom 404 handler
 app = FastAPI(docs_url=None, redoc_url=None)
@@ -49,6 +58,13 @@ app.add_middleware(
     same_site="Lax",  # Adjust depending on your needs
     # https_only=True  # Use only if you are using HTTPS
 )
+
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    logging.info(f"Incoming request: {request.method} {request.url}")
+    response = await call_next(request)
+    logging.info(f"Outgoing response: {response.status_code}")
+    return response
 
 # Mount the static folder to serve images
 app.mount("/static", StaticFiles(directory=os.path.join(os.path.dirname(__file__), "../static")), name="static")
@@ -372,6 +388,47 @@ async def admin_dashboard(request: Request):
         "request": request,
         "email": request.session['email']
     })
+
+@app.get("/logs", response_class=HTMLResponse)
+async def logs_page(request: Request):
+    """
+    Admin logs page showing the last 250 log entries.
+    Only accessible to users with admin@slidepull.net email.
+    """
+    # Ensure the user is logged in
+    if 'email' not in request.session:
+        return RedirectResponse(url="/login")
+
+    # Check if the user has admin access
+    if request.session['email'] not in ADMIN_EMAILS:
+        # Redirect non-admin users to the regular dashboard
+        return RedirectResponse(url="/dashboard")
+
+    log_entries = []
+    try:
+        with open("server.log", "r") as f:
+            # Read all lines and get the last 250
+            lines = f.readlines()
+            last_250_lines = lines[-250:]
+
+            for line in last_250_lines:
+                # Assuming log format is 'YYYY-MM-DD HH:MM:SS,ms - name - level - message'
+                parts = line.split(' - ', 3)
+                if len(parts) == 4:
+                    timestamp = parts[0]
+                    message = parts[3].strip()
+                    log_entries.append({"timestamp": timestamp, "message": message})
+                else:
+                    # Handle lines that don't match the expected format
+                    log_entries.append({"timestamp": "N/A", "message": line.strip()})
+
+    except FileNotFoundError:
+        log_entries.append({"timestamp": "N/A", "message": "Log file not found."})
+    except Exception as e:
+        log_entries.append({"timestamp": "N/A", "message": f"Error reading log file: {str(e)}"})
+
+    return templates.TemplateResponse("admin/logs.html", {"request": request, "log_entries": log_entries})
+
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request, db: mysql.connector.connection.MySQLConnection = Depends(get_db)):
