@@ -47,6 +47,72 @@
 
 <!-- Top Section: User Profile and Upload -->
 <div class="row mb-4">
+    <!-- User Profile Section -->
+    <div class="col-lg-6">
+        <div class="card bg-light-gray card-navy-shadow h-100">
+            <div class="card-body d-flex flex-column">
+                <h1 class="mb-2">Welcome, {{ email }}</h1>
+                <div class="d-flex flex-wrap mb-3">
+                    <span class="badge bg-secondary me-2 mb-2">Member since: {{ member_since }}</span>
+                    {% if premium_status %}
+                        <span class="badge bg-success me-2 mb-2">Premium User</span>
+                    {% else %}
+                        <span class="badge bg-secondary me-2 mb-2">Free User</span>
+                    {% endif %}
+                    <span class="badge bg-info me-2 mb-2">User ID: {{ user_id }}</span>
+                </div>
+
+                {% if not premium_status %}
+                    <div class="mt-3">
+                        <a href="/upgrade" class="btn btn-outline-primary">
+                            <i class="fas fa-crown me-1"></i> Upgrade to Premium
+                        </a>
+                    </div>
+                {% endif %}
+
+                {% if is_admin %}
+                    <div class="mt-3">
+                        <a href="/admin" class="btn btn-danger">
+                            <i class="fas fa-cogs me-1"></i> Admin Panel
+                        </a>
+                    </div>
+                {% endif %}
+
+                <!-- Social Icons -->
+                <div class="mt-auto pt-4">
+                    <hr class="my-3">
+                    <h5 class="mb-3">Connect With Us</h5>
+                    <div class="d-flex flex-wrap gap-2">
+                        <!-- Bug Report Button -->
+                        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#bugReportModal">
+                            <i class="fas fa-bug"></i>
+                        </button>
+
+                        <!-- Contact Button -->
+                        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#contactModal">
+                            <i class="fas fa-envelope"></i>
+                        </button>
+
+                        <!-- LinkedIn Button -->
+                        <a href="https://linkedin.com" target="_blank" class="btn btn-outline-primary">
+                            <i class="fab fa-linkedin-in"></i>
+                        </a>
+
+                        <!-- Reddit Button -->
+                        <a href="https://reddit.com" target="_blank" class="btn btn-outline-danger">
+                            <i class="fab fa-reddit-alien"></i>
+                        </a>
+
+                        <!-- Facebook Button -->
+                        <a href="https://facebook.com" target="_blank" class="btn btn-outline-primary">
+                            <i class="fab fa-facebook-f"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Upload Section -->
     <div class="col-lg-6 mb-4 mb-lg-0">
         <div class="card mb-0 card-navy-shadow h-100">
@@ -75,7 +141,7 @@
                                         <i class="fas fa-folder-open me-1"></i>
                                         Choose file
                                     </button>
-                                    <button type="submit" id="uploadButton" class="btn btn-primary {% if not account_activated %}btn-secondary{% endif %}" style="width: 120px; height: 100px;"
+                                    <button type="submit" id="uploadButton" class="btn btn-primary {% if not account_activated %}btn-secondary{% endif %}"
                                             {% if not account_activated %}disabled
                                             data-bs-toggle="tooltip"
                                             data-bs-placement="top"
@@ -88,8 +154,8 @@
                                     </button>
                                 </div>
                                 <div class="form-text mt-2">
-                                    Only .pptx files are supported. 
-                                    Maximum file size: 
+                                    Only .pptx files are supported.
+                                    Maximum file size:
                                     {% if premium_status == 0 %}
                                         20MB (Free tier)
                                     {% elif premium_status == 1 %}
@@ -107,72 +173,6 @@
                         </div>
                     </form>
                 {% endif %}
-            </div>
-        </div>
-    </div>
-    
-    <!-- User Profile Section -->
-    <div class="col-lg-6">
-        <div class="card bg-light-gray card-navy-shadow h-100">
-            <div class="card-body d-flex flex-column">
-                <h1 class="mb-2">Welcome, {{ email }}</h1>
-                <div class="d-flex flex-wrap mb-3">
-                    <span class="badge bg-secondary me-2 mb-2">Member since: {{ member_since }}</span>
-                    {% if premium_status %}
-                        <span class="badge bg-success me-2 mb-2">Premium User</span>
-                    {% else %}
-                        <span class="badge bg-secondary me-2 mb-2">Free User</span>
-                    {% endif %}
-                    <span class="badge bg-info me-2 mb-2">User ID: {{ user_id }}</span>
-                </div>
-                
-                {% if not premium_status %}
-                    <div class="mt-3">
-                        <a href="/upgrade" class="btn btn-outline-primary">
-                            <i class="fas fa-crown me-1"></i> Upgrade to Premium
-                        </a>
-                    </div>
-                {% endif %}
-                
-                {% if is_admin %}
-                    <div class="mt-3">
-                        <a href="/admin" class="btn btn-danger">
-                            <i class="fas fa-cogs me-1"></i> Admin Panel
-                        </a>
-                    </div>
-                {% endif %}
-                
-                <!-- Social Icons -->
-                <div class="mt-auto pt-4">
-                    <hr class="my-3">
-                    <h5 class="mb-3">Connect With Us</h5>
-                    <div class="d-flex flex-wrap gap-2">
-                        <!-- Bug Report Button -->
-                        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#bugReportModal">
-                            <i class="fas fa-bug"></i>
-                        </button>
-                        
-                        <!-- Contact Button -->
-                        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#contactModal">
-                            <i class="fas fa-envelope"></i>
-                        </button>
-                        
-                        <!-- LinkedIn Button -->
-                        <a href="https://linkedin.com" target="_blank" class="btn btn-outline-primary">
-                            <i class="fab fa-linkedin-in"></i>
-                        </a>
-                        
-                        <!-- Reddit Button -->
-                        <a href="https://reddit.com" target="_blank" class="btn btn-outline-danger">
-                            <i class="fab fa-reddit-alien"></i>
-                        </a>
-                        
-                        <!-- Facebook Button -->
-                        <a href="https://facebook.com" target="_blank" class="btn btn-outline-primary">
-                            <i class="fab fa-facebook-f"></i>
-                        </a>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
