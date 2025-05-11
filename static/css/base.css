@@ -272,9 +272,17 @@ footer {
 }
 
 .card-navy-border {
-    border: 1px solid var(--primary-color) !important; /* Thin navy border */
+    border: 2px solid var(--primary-color) !important; /* Navy blue border */
 }
 
 .card-navy-shadow {
     box-shadow: 0 8px 16px rgba(0, 48, 143, 0.3) !important; /* Stronger navy blue shadow */
+}
+
+.container-border {
+    border: 1px solid var(--primary-color); /* Thin blue border */
+}
+
+.row.g-4 .col .card {
+    border: 1px solid var(--primary-color) !important; /* 1px navy blue border for presentation slots */
 }

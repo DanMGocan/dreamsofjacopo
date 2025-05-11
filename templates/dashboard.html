@@ -49,7 +49,7 @@
 <div class="row mb-4">
     <!-- User Profile Section -->
     <div class="col-lg-6">
-        <div class="card bg-light-gray card-navy-shadow h-100">
+<div class="card bg-light-gray card-navy-shadow card-navy-border h-100 container-border">
             <div class="card-body d-flex flex-column">
                 <h1 class="mb-2">Welcome, {{ email }}</h1>
                 <div class="d-flex flex-wrap mb-3">
@@ -115,7 +115,7 @@
 
     <!-- Upload Section -->
     <div class="col-lg-6 mb-4 mb-lg-0">
-        <div class="card mb-0 card-navy-shadow h-100">
+<div class="card mb-0 card-navy-shadow card-navy-border h-100 container-border">
             <div class="card-header bg-white">
                 <h2 class="section-title h4 mb-0">
                     <i class="fas fa-upload me-2"></i> Upload Presentation
@@ -163,6 +163,7 @@
                                     {% elif premium_status == 2 %}
                                         50MB (Corporate tier)
                                     {% endif %}
+                                    All uploaded presentations are processed on Azure Virtual machines and are securely hosted in Azure Blob storage. Depending on the size and number of slides, the conversion might take up to 30 seconds.
                                 </div>
                                 {% if not account_activated %}
                                     <div class="form-text text-danger mt-2">
@@ -207,7 +208,7 @@
 {% endif %}
 
 <!-- Presentation Slots List -->
-<div class="card card-navy-shadow"> {# Added card-navy-shadow #}
+<div class="card card-navy-shadow card-navy-border container-border"> {# Added card-navy-shadow #}
     <div class="card-header bg-white">
         <h2 class="section-title h4 mb-0">
             <i class="fas fa-file-powerpoint me-2"></i> Used Presentation Slots 
@@ -227,7 +228,7 @@
             {% if presentations %}
                 {% for presentation in presentations %}
                     <div class="col"> {# Each column will contain a card #}
-                        <div class="card h-100 border shadow-sm"> {# Added 'border' class #}
+                        <div class="card h-100 border shadow-sm container-border"> {# Added 'border' class #}
                             <div class="card-header bg-light-gray">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <h3 class="h5 mb-0">
@@ -301,7 +302,7 @@
                 {# For premium users, show remaining empty slots (up to 3 total) #}
                 {% for i in range(presentations|length, 3) %}
                     <div class="col">
-                        <div class="card h-100 border shadow-sm">
+                    <div class="card h-100 border shadow-sm container-border">
                             <div class="card-header bg-light-gray">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <h3 class="h5 mb-0">
@@ -322,7 +323,7 @@
                 {# For corporate users, show remaining empty slots (up to 6 total) #}
                 {% for i in range(presentations|length, 6) %}
                     <div class="col">
-                        <div class="card h-100 border shadow-sm">
+                    <div class="card h-100 border shadow-sm container-border">
                             <div class="card-header bg-light-gray">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <h3 class="h5 mb-0">
@@ -362,6 +363,13 @@
         </div>
     </div>
 </div>
+<!-- Development Updates Button -->
+<div class="mt-4"> {# Added margin-top for spacing #}
+    <a href="/development" class="btn btn-outline-primary"> {# Changed to btn-outline-primary for navy blue #}
+        <i class="fas fa-code me-1"></i> Development updates
+    </a>
+</div>
+
 <!-- Bug Report Modal -->
 <div class="modal fade" id="bugReportModal" tabindex="-1" aria-labelledby="bugReportModalLabel" aria-hidden="true">
     <div class="modal-dialog">

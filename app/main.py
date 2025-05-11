@@ -118,6 +118,11 @@ async def about_page(request: Request):
     # Show the About page
     return templates.TemplateResponse("about.html", {"request": request})
 
+@app.get("/development", response_class=HTMLResponse)
+async def development_page(request: Request):
+    # Show the Development Updates page
+    return templates.TemplateResponse("development.html", {"request": request})
+
 @app.get("/account", response_class=HTMLResponse)
 async def account_page(request: Request, db: mysql.connector.connection.MySQLConnection = Depends(get_db)):
     """
