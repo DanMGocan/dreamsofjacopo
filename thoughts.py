@@ -8,3 +8,4 @@
 # Cron jobs to clear the blob and DB of data no longer in use 
 
 # Invalid password error 
+# Add CAPTCHA to the registration page to prevent spam registrations
