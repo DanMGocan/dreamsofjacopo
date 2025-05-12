@@ -6,3 +6,5 @@
 # Impose password verifications when registering 
 
 # Cron jobs to clear the blob and DB of data no longer in use 
+
+# Invalid password error 
