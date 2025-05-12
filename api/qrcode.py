@@ -8,6 +8,9 @@ import os
 from azure.storage.blob import BlobServiceClient, BlobClient
 from dotenv import load_dotenv
 import io
+import logging
+from datetime import datetime, timezone
+from helpers.blob_op import refresh_sas_token_if_needed
 
 # Load environment variables
 load_dotenv()
@@ -44,23 +47,21 @@ async def generate_pdf_qr(
     """
     Generates a QR code for the entire PDF presentation.
     The QR code will point to a tracking endpoint that increments the download count.
+    
+    This endpoint also checks if the SAS token is expired and refreshes it if needed.
     """
     cursor = None
     try:
-        # Get the PDF URL and SAS token from the database
+        # Get the PDF URL, SAS token, and expiry date from the database
         cursor = db.cursor(dictionary=True)
         cursor.execute(
-            "SELECT url, sas_token FROM pdf WHERE pdf_id = %s",
+            "SELECT url, sas_token, sas_token_expiry FROM pdf WHERE pdf_id = %s",
             (pdf_id,)
         )
         pdf_data = cursor.fetchone()
 
         if not pdf_data:
             raise HTTPException(status_code=404, detail="PDF presentation not found")
-
-        pdf_url = pdf_data['url']
-        sas_token = pdf_data['sas_token']
-        full_pdf_url = f"{pdf_url}?{sas_token}"
 
         # Get user alias for file organization
         user_id = request.session.get('user_id')
@@ -73,10 +74,39 @@ async def generate_pdf_qr(
             raise HTTPException(status_code=404, detail="User alias not found")
         user_alias = user_data['alias']
 
-        # Get the PDF URL and SAS token
+        # Check if the SAS token is expired and refresh if needed
         pdf_url = pdf_data['url']
-        sas_token = pdf_data['sas_token']
-        full_pdf_url = f"{pdf_url}?{sas_token}"
+        current_sas_token = pdf_data['sas_token']
+        sas_token_expiry = pdf_data['sas_token_expiry']
+        
+        # Extract the file path from the URL
+        url_parts = pdf_url.split('/')
+        file_path = '/'.join(url_parts[4:])  # Skip the protocol and domain parts
+        
+        # Check if token is expired and refresh if needed
+        if sas_token_expiry is None or datetime.now(timezone.utc) >= sas_token_expiry:
+            logging.info(f"Refreshing expired SAS token for PDF {pdf_id} during QR code generation")
+            new_token, new_expiry = refresh_sas_token_if_needed(
+                alias=user_alias,
+                file_path=file_path,
+                current_sas_token=current_sas_token,
+                sas_token_expiry=sas_token_expiry
+            )
+            
+            # Update the database with the new token
+            update_cursor = db.cursor()
+            update_cursor.execute(
+                "UPDATE pdf SET sas_token = %s, sas_token_expiry = %s WHERE pdf_id = %s",
+                (new_token, new_expiry, pdf_id)
+            )
+            db.commit()
+            update_cursor.close()
+            
+            # Use the new token
+            full_pdf_url = f"{pdf_url}?{new_token}"
+        else:
+            # Token is still valid, use the existing one
+            full_pdf_url = f"{pdf_url}?{current_sas_token}"
         
         # Generate the QR code with the direct URL to the PDF
         qr_code_url, qr_code_sas_token, qr_code_sas_token_expiry = generate_qr(

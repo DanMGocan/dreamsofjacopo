@@ -10,6 +10,8 @@ import mysql.connector
 from database_op.database import get_db
 import asyncio
 import json
+from datetime import datetime, timezone
+from helpers.blob_op import refresh_sas_token_if_needed
 
 load_dotenv()
 
@@ -452,6 +454,25 @@ async def dashboard(request: Request, db: mysql.connector.connection.MySQLConnec
     flash_message = get_flash_message(request)
 
     cursor = db.cursor(dictionary=True)
+    
+    # Get the user's alias (needed for token refresh)
+    cursor.execute("SELECT alias FROM user WHERE user_id = %s", (user_id,))
+    user_data = cursor.fetchone()
+    if not user_data or 'alias' not in user_data:
+        logging.error(f"Couldn't find alias for user {user_id}")
+        return templates.TemplateResponse("dashboard.html", {
+            "request": request,
+            "user_id": user_id,
+            "email": email,
+            "flash_message": "Error loading user data. Please contact support.",
+            "account_activated": account_activated,
+            "premium_status": premium_status,
+            "member_since": member_since,
+            "presentations": [],
+            "is_admin": email in ADMIN_EMAILS
+        })
+    
+    user_alias = user_data['alias']
 
     # Fetch presentations and associated sets using LEFT JOIN
     cursor.execute("""
@@ -470,41 +491,111 @@ async def dashboard(request: Request, db: mysql.connector.connection.MySQLConnec
     # Organize data into presentations with their sets
     presentations = []
     presentation_dict = {}
-    for row in rows:
-        pdf_id = row['pdf_id']
-        if pdf_id not in presentation_dict:
-            # New presentation
-            # Construct the full PDF URL with SAS token for direct viewing
-            pdf_url_with_sas = f"{row['url']}?{row['sas_token']}"
-            
-            presentation = {
-                'pdf_id': pdf_id,
-                'original_filename': row['original_filename'],
-                'url': row['url'],
-                'url_with_sas': pdf_url_with_sas,
-                'sas_token': row['sas_token'],
-                'uploaded_on': row['uploaded_on'],
-                'num_slides': row['num_slides'],
-                'file_size_kb': row['file_size_kb'],
-                'download_count': row['download_count'] or 0,
-                'sets': []
-            }
-            presentation_dict[pdf_id] = presentation
-            presentations.append(presentation)
-        else:
-            presentation = presentation_dict[pdf_id]
+    update_cursor = None
+    
+    try:
+        update_cursor = db.cursor()
+        
+        for row in rows:
+            pdf_id = row['pdf_id']
+            if pdf_id not in presentation_dict:
+                # New presentation
+                # Check if the SAS token is expired and refresh if needed
+                current_sas_token = row['sas_token']
+                sas_token_expiry = row['uploaded_on']  # This is actually the sas_token_expiry
+                original_filename = row['original_filename']
+                
+                # Extract the file path from the URL
+                url_parts = row['url'].split('/')
+                file_path = '/'.join(url_parts[4:])  # Skip the protocol and domain parts
+                
+                # Check if token is expired and refresh if needed
+                if sas_token_expiry is None or datetime.now(timezone.utc) >= sas_token_expiry:
+                    logging.info(f"Refreshing expired SAS token for PDF {pdf_id}")
+                    new_token, new_expiry = refresh_sas_token_if_needed(
+                        alias=user_alias,
+                        file_path=file_path,
+                        current_sas_token=current_sas_token,
+                        sas_token_expiry=sas_token_expiry
+                    )
+                    
+                    # Update the database with the new token
+                    update_cursor.execute(
+                        "UPDATE pdf SET sas_token = %s, sas_token_expiry = %s WHERE pdf_id = %s",
+                        (new_token, new_expiry, pdf_id)
+                    )
+                    db.commit()
+                    
+                    # Use the new token
+                    pdf_url_with_sas = f"{row['url']}?{new_token}"
+                    current_sas_token = new_token
+                else:
+                    # Token is still valid, use the existing one
+                    pdf_url_with_sas = f"{row['url']}?{current_sas_token}"
+                
+                presentation = {
+                    'pdf_id': pdf_id,
+                    'original_filename': original_filename,
+                    'url': row['url'],
+                    'url_with_sas': pdf_url_with_sas,
+                    'sas_token': current_sas_token,
+                    'uploaded_on': sas_token_expiry,
+                    'num_slides': row['num_slides'],
+                    'file_size_kb': row['file_size_kb'],
+                    'download_count': row['download_count'] or 0,
+                    'sets': []
+                }
+                presentation_dict[pdf_id] = presentation
+                presentations.append(presentation)
+            else:
+                presentation = presentation_dict[pdf_id]
 
-        # Add set if it exists
-        if row['set_id'] is not None:
-            # Construct the full QR code URL with SAS token
-            qrcode_url_with_sas = f"{row['qrcode_url']}?{row['qrcode_sas_token']}"
-            presentation['sets'].append({
-                'set_id': row['set_id'],
-                'name': row['set_name'],
-                'qrcode_url_with_sas': qrcode_url_with_sas,
-                'download_count': row['set_download_count'] or 0,
-                'slide_count': row['slide_count'] or 0
-            })
+            # Add set if it exists
+            if row['set_id'] is not None:
+                set_id = row['set_id']
+                set_name = row['set_name']
+                qrcode_url = row['qrcode_url']
+                qrcode_sas_token = row['qrcode_sas_token']
+                
+                # Check if the QR code SAS token needs to be refreshed
+                # We would need to query the set table to get the expiry date
+                # For now, we'll assume it might be expired and refresh it
+                
+                # Extract the file path from the URL
+                if qrcode_url:
+                    url_parts = qrcode_url.split('/')
+                    qr_file_path = '/'.join(url_parts[4:])  # Skip the protocol and domain parts
+                    
+                    # Refresh the QR code SAS token
+                    new_qr_token, new_qr_expiry = refresh_sas_token_if_needed(
+                        alias=user_alias,
+                        file_path=qr_file_path,
+                        current_sas_token=qrcode_sas_token
+                    )
+                    
+                    # Update the database with the new token if it changed
+                    if new_qr_token != qrcode_sas_token:
+                        logging.info(f"Refreshing expired SAS token for QR code of set {set_id}")
+                        update_cursor.execute(
+                            "UPDATE `set` SET qrcode_sas_token = %s, qrcode_sas_token_expiry = %s WHERE set_id = %s",
+                            (new_qr_token, new_qr_expiry, set_id)
+                        )
+                        db.commit()
+                        qrcode_sas_token = new_qr_token
+                    
+                    # Construct the full QR code URL with SAS token
+                    qrcode_url_with_sas = f"{qrcode_url}?{qrcode_sas_token}"
+                    
+                    presentation['sets'].append({
+                        'set_id': set_id,
+                        'name': set_name,
+                        'qrcode_url_with_sas': qrcode_url_with_sas,
+                        'download_count': row['set_download_count'] or 0,
+                        'slide_count': row['slide_count'] or 0
+                    })
+    finally:
+        if update_cursor:
+            update_cursor.close()
 
     cursor.close()
 
@@ -530,6 +621,8 @@ async def download_pdf(pdf_id: int, request: Request, db: mysql.connector.connec
     Endpoint to download a PDF file with the proper filename.
     This adds the Content-Disposition header to force the browser to download the file
     with the original filename.
+    
+    This endpoint also checks if the SAS token is expired and refreshes it if needed.
     """
     # Ensure the user is logged in
     if 'user_id' not in request.session:
@@ -541,19 +634,60 @@ async def download_pdf(pdf_id: int, request: Request, db: mysql.connector.connec
         # Get the PDF information from the database
         cursor = db.cursor(dictionary=True)
         cursor.execute("""
-            SELECT original_filename, url, sas_token
+            SELECT original_filename, url, sas_token, sas_token_expiry
             FROM pdf
             WHERE pdf_id = %s AND user_id = %s
         """, (pdf_id, user_id))
         
         pdf_info = cursor.fetchone()
-        cursor.close()
         
         if not pdf_info:
+            cursor.close()
             return {"error": "PDF not found or you don't have permission to access it"}
         
-        # Construct the full URL with SAS token
-        pdf_url_with_sas = f"{pdf_info['url']}?{pdf_info['sas_token']}"
+        # Get the user's alias (needed for token refresh)
+        cursor.execute("SELECT alias FROM user WHERE user_id = %s", (user_id,))
+        user_data = cursor.fetchone()
+        cursor.close()
+        
+        if not user_data or 'alias' not in user_data:
+            logging.error(f"Couldn't find alias for user {user_id}")
+            return {"error": "User data not found. Please contact support."}
+        
+        user_alias = user_data['alias']
+        
+        # Check if the SAS token is expired and refresh if needed
+        current_sas_token = pdf_info['sas_token']
+        sas_token_expiry = pdf_info['sas_token_expiry']
+        
+        # Extract the file path from the URL
+        url_parts = pdf_info['url'].split('/')
+        file_path = '/'.join(url_parts[4:])  # Skip the protocol and domain parts
+        
+        # Check if token is expired and refresh if needed
+        if sas_token_expiry is None or datetime.now(timezone.utc) >= sas_token_expiry:
+            logging.info(f"Refreshing expired SAS token for PDF {pdf_id} during download")
+            new_token, new_expiry = refresh_sas_token_if_needed(
+                alias=user_alias,
+                file_path=file_path,
+                current_sas_token=current_sas_token,
+                sas_token_expiry=sas_token_expiry
+            )
+            
+            # Update the database with the new token
+            update_cursor = db.cursor()
+            update_cursor.execute(
+                "UPDATE pdf SET sas_token = %s, sas_token_expiry = %s WHERE pdf_id = %s",
+                (new_token, new_expiry, pdf_id)
+            )
+            db.commit()
+            update_cursor.close()
+            
+            # Use the new token
+            pdf_url_with_sas = f"{pdf_info['url']}?{new_token}"
+        else:
+            # Token is still valid, use the existing one
+            pdf_url_with_sas = f"{pdf_info['url']}?{current_sas_token}"
         
         # Create a redirect response with the Content-Disposition header
         response = RedirectResponse(url=pdf_url_with_sas)

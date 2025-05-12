@@ -79,6 +79,27 @@ def upload_thumbnails():
 def upload_zip():
     pass 
 
+def refresh_sas_token_if_needed(alias, file_path, current_sas_token=None, sas_token_expiry=None, content_disposition=None):
+    """
+    Checks if a SAS token is expired and regenerates it if needed.
+    
+    This function is a wrapper around generate_sas_token_for_file that makes it easier
+    to use in the context of refreshing tokens. It's particularly useful when retrieving
+    files from the database and checking if their tokens need to be refreshed.
+    
+    Returns:
+        tuple: (sas_token, sas_token_expiry) - Either the original token if still valid,
+               or a newly generated token and its expiry date.
+    """
+    # Use the existing function which already has expiry checking logic
+    return generate_sas_token_for_file(
+        alias=alias,
+        file_path=file_path,
+        current_sas_token=current_sas_token,
+        sas_token_expiry=sas_token_expiry,
+        content_disposition=content_disposition
+    )
+
 def upload_to_blob(blob_name, file_content, content_type, user_alias, content_disposition=None):
     """
     Uploads any file to Azure Blob Storage and returns access information.
