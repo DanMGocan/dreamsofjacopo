@@ -3,7 +3,13 @@
 {% block title %}Home | SlidePull{% endblock %}
 
 {% block head %}
-<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+<script src="https://www.google.com/recaptcha/api.js?render={{ request.app.state.RECAPTCHA_SITE_KEY }}" async defer></script>
+<script>
+  function onSubmit(token) {
+    document.getElementById("g-recaptcha-response-token").value = token;
+    document.getElementById("registrationForm").submit();
+  }
+</script>
 {% endblock %}
 
 {% block content %}
@@ -117,11 +123,12 @@ Say goodbye to bulky email attachments and compatibility issues. Say goodbye to 
                                 <div class="mb-3">
                                     <div id="password-mismatch-error" class="text-danger" style="display: none;">Passwords do not match.</div>
                                 </div>
-                                <div class="d-grid mb-3">
-                                    <div class="g-recaptcha" data-sitekey="{{ request.app.state.RECAPTCHA_SITE_KEY }}"></div>
-                                </div>
+                                <input type="hidden" name="g-recaptcha-response" id="g-recaptcha-response-token">
                                 <div class="d-grid">
-                                    <button type="submit" class="btn btn-primary">
+                                    <button type="submit" class="btn btn-primary g-recaptcha" 
+                                            data-sitekey="{{ request.app.state.RECAPTCHA_SITE_KEY }}" 
+                                            data-callback="onSubmit"
+                                            data-action="submit">
                                         <i class="fas fa-user-plus me-2"></i> Create Account
                                     </button>
                                 </div>

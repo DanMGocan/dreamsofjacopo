@@ -73,13 +73,13 @@ async def create_account(
     if not email or not password:
         raise HTTPException(status_code=400, detail="Email and password are required")
 
-    # Verify reCAPTCHA
+    # Verify reCAPTCHA v3
     if not RECAPTCHA_SECRET_KEY:
         print("RECAPTCHA_SECRET_KEY not set in environment variables.")
         raise HTTPException(status_code=500, detail="Server configuration error: reCAPTCHA secret key not set.")
 
     if not recaptcha_response:
-        raise HTTPException(status_code=400, detail="Please complete the reCAPTCHA.")
+        raise HTTPException(status_code=400, detail="reCAPTCHA verification failed. Please try again.")
 
     captcha_verify_url = "https://www.google.com/recaptcha/api/siteverify"
     captcha_data = {
@@ -94,6 +94,12 @@ async def create_account(
 
         if not result.get("success"):
             print(f"reCAPTCHA verification failed: {result.get('error-codes')}")
+            raise HTTPException(status_code=400, detail="reCAPTCHA verification failed. Please try again.")
+        
+        # For v3, also check the score (0.0 to 1.0, where 1.0 is very likely a good interaction)
+        score = result.get("score", 0)
+        if score < 0.5:  # You can adjust this threshold based on your needs
+            print(f"reCAPTCHA score too low: {score}")
             raise HTTPException(status_code=400, detail="reCAPTCHA verification failed. Please try again.")
 
     except requests.exceptions.RequestException as e:

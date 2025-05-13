@@ -180,6 +180,7 @@
 </div>
 
 <!-- Alerts Section -->
+<div class="mb-4"> {# Added margin-bottom for spacing below alerts #}
 {% if flash_message %}
     <div class="alert alert-success" role="alert">
         <i class="fas fa-check-circle me-2"></i> {{ flash_message }}
@@ -206,9 +207,10 @@
         </p>
     </div>
 {% endif %}
+</div> {# End of alerts container #}
 
 <!-- Presentation Slots List -->
-<div class="card card-navy-shadow card-navy-border container-border"> {# Added card-navy-shadow #}
+<div class="card mb-4 card-navy-shadow card-navy-border container-border"> {# Added card-navy-shadow #}
     <div class="card-header bg-white">
         <h2 class="section-title h4 mb-0">
             <i class="fas fa-file-powerpoint me-2"></i> Used Presentation Slots 
