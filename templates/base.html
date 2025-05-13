@@ -21,9 +21,10 @@
 
 
     <!-- Favicon -->
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
-    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ request.url_for('static', path='apple-touch-icon.png') }}"> {# Note: apple-touch-icon.png is not in the repository #}
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ request.url_for('static', path='favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ request.url_for('static', path='favicon-16x16.png') }}">
+    <link rel="shortcut icon" href="{{ request.url_for('static', path='favicon.ico') }}">
     
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ request.url_for('static', path='css/base.css') }}">
