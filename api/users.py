@@ -73,6 +73,10 @@ async def create_account(
     if not email or not password:
         raise HTTPException(status_code=400, detail="Email and password are required")
 
+    # Password length verification
+    if len(password) < 8:
+        raise HTTPException(status_code=400, detail="Password must be at least 8 characters long")
+
     # Verify reCAPTCHA v3
     if not RECAPTCHA_SECRET_KEY:
         print("RECAPTCHA_SECRET_KEY not set in environment variables.")

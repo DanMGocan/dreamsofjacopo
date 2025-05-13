@@ -5,9 +5,77 @@
 {% block head %}
 <script src="https://www.google.com/recaptcha/api.js?render={{ request.app.state.RECAPTCHA_SITE_KEY }}" async defer></script>
 <script>
-  function onSubmit(token) {
-    document.getElementById("g-recaptcha-response-token").value = token;
-    document.getElementById("registrationForm").submit();
+  async function onSubmit(token) {
+    const form = document.getElementById("registrationForm");
+    const passwordInput = document.getElementById('reg-password');
+    const recaptchaTokenInput = document.getElementById("g-recaptcha-response-token");
+
+    // It's important to get the element inside the function,
+    // as it might not exist when the script is initially parsed.
+    const passwordLengthWarning = document.getElementById('password-length-warning'); 
+    console.log("passwordLengthWarning element:", passwordLengthWarning); // For debugging
+
+    // Client-side password length validation
+    if (passwordInput.value.length < 8) {
+        if (passwordLengthWarning) {
+            passwordLengthWarning.textContent = "Password must be at least 8 characters long."; // Set text content here
+            passwordLengthWarning.style.display = 'block';
+        }
+        return; // Stop the submission process
+    } else {
+        if (passwordLengthWarning) {
+            passwordLengthWarning.style.display = 'none';
+        }
+    }
+
+    recaptchaTokenInput.value = token;
+
+    // Use fetch to submit the form data
+    const formData = new FormData(form);
+    try {
+        const response = await fetch(form.action, {
+            method: form.method,
+            body: formData
+        });
+
+        if (!response.ok) {
+            // Handle HTTP errors
+            const error = await response.json();
+            if (passwordLengthWarning) { // Check if element exists before using it
+                if (error.detail) {
+                    // Display the backend error message
+                    passwordLengthWarning.textContent = error.detail;
+                    passwordLengthWarning.style.display = 'block';
+                } else {
+                    // Display a generic error if no specific detail is provided
+                    passwordLengthWarning.textContent = 'An error occurred during registration.';
+                    passwordLengthWarning.style.display = 'block';
+                }
+            }
+        } else {
+            // Handle successful response (e.g., redirect)
+            if (response.redirected) {
+                window.location.href = response.url;
+            } else {
+                // Handle other successful responses if necessary
+                const responseData = await response.json(); // Or .text() if not JSON
+                console.log('Registration successful:', responseData);
+                // Potentially redirect or show success message based on responseData
+                 if (responseData.redirect_url) {
+                    window.location.href = responseData.redirect_url;
+                 } else {
+                    // Fallback or default success behavior
+                    window.location.href = '/dashboard'; // Example redirect
+                 }
+            }
+        }
+    } catch (error) {
+        console.error('Error submitting registration form:', error);
+        if (passwordLengthWarning) { // Check if element exists
+            passwordLengthWarning.textContent = 'An unexpected error occurred. Please try again.';
+            passwordLengthWarning.style.display = 'block';
+        }
+    }
   }
 </script>
 {% endblock %}
@@ -122,6 +190,7 @@ Say goodbye to bulky email attachments and compatibility issues. Say goodbye to 
                                 </div>
                                 <div class="mb-3">
                                     <div id="password-mismatch-error" class="text-danger" style="display: none;">Passwords do not match.</div>
+                                    <div id="password-length-warning" class="text-danger" style="display: none;">Password must be at least 8 characters long.</div>
                                 </div>
                                 <input type="hidden" name="g-recaptcha-response" id="g-recaptcha-response-token">
                                 <div class="d-grid">
@@ -207,5 +276,20 @@ Say goodbye to bulky email attachments and compatibility issues. Say goodbye to 
     </div>
 </div>
 
+<script>
+    document.getElementById('registrationForm').addEventListener('submit', function(event) {
+        const passwordInput = document.getElementById('reg-password');
+        const passwordLengthWarning = document.getElementById('password-length-warning');
+        
+        if (passwordInput.value.length < 8) {
+            passwordLengthWarning.style.display = 'block';
+            event.preventDefault(); // Prevent form submission
+        } else {
+            passwordLengthWarning.style.display = 'none';
+        }
+    });
+</script>
+
 <script src="{{ request.url_for('static', path='js/home.js') }}"></script>
+
 {% endblock %}
