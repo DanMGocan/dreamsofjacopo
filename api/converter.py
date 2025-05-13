@@ -25,6 +25,7 @@ from pydantic import parse_obj_as
 from datetime import datetime, timedelta
 import asyncio
 import traceback
+import uuid
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -229,9 +230,13 @@ async def upload_pptx(
         # Save the PDF information to our database
         try:
             cursor = db.cursor(dictionary=True, buffered=True)
+            
+            # Generate a unique code for this PDF
+            pdf_unique_code = str(uuid.uuid4())
+            
             cursor.execute(
-                "INSERT INTO pdf (user_id, original_filename, url, sas_token, sas_token_expiry, file_size_kb) VALUES (%s, %s, %s, %s, %s, %s)",
-                (user_id, original_filename, pdf_blob_url, sas_token_pdf, sas_token_expiry, file_size_kb)
+                "INSERT INTO pdf (user_id, original_filename, url, sas_token, sas_token_expiry, file_size_kb, unique_code) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                (user_id, original_filename, pdf_blob_url, sas_token_pdf, sas_token_expiry, file_size_kb, pdf_unique_code)
             )
             db.commit()
             
@@ -278,10 +283,75 @@ async def upload_pptx(
         finally:
             if cursor:
                 cursor.close()
+                cursor = None # Reset cursor after use
+
+        # Step 3: Generate and store the QR code for the full PDF
+        conversion_progress[str(pdf_id)]["status"] = "generating_pdf_qr"
+        
+        try:
+            # Get the full PDF URL with its SAS token
+            # full_pdf_url_with_sas = f"{pdf_blob_url}?{sas_token_pdf}" # No longer needed for QR generation
+            
+            # Generate the QR code for the full PDF using the unique code
+            pdf_qr_code_url, pdf_qr_code_sas_token, pdf_qr_code_sas_token_expiry = generate_qr(
+                # link_with_sas=full_pdf_url_with_sas, # No longer needed
+                user_alias=user_alias,
+                pdf_id=pdf_id, # Keep pdf_id for blob naming
+                set_name="full_pdf", # Use a default name for the full PDF QR
+                pdf_unique_code=pdf_unique_code # Pass the unique code
+            )
+            
+            # Verify database connection is still valid before saving QR info
+            if not verify_db_connection(db):
+                logger.error("Database connection lost before saving PDF QR information")
+                try:
+                    db = get_connection()
+                except Exception as e:
+                    logger.error(f"Failed to get a new database connection: {e}")
+                    conversion_progress[str(pdf_id)]["status"] = "error"
+                    raise HTTPException(
+                        status_code=500,
+                        detail="Database connection error. Please try again later."
+                    )
+
+            # Update the PDF record with the QR code information
+            cursor = db.cursor()
+            cursor.execute(
+                """
+                UPDATE pdf
+                SET pdf_qrcode_url = %s, pdf_qrcode_sas_token = %s, pdf_qrcode_sas_token_expiry = %s
+                WHERE pdf_id = %s
+                """,
+                (
+                    pdf_qr_code_url,
+                    pdf_qr_code_sas_token,
+                    pdf_qr_code_sas_token_expiry,
+                    pdf_id
+                )
+            )
+            db.commit()
+            cursor.close()
+            cursor = None # Reset cursor after use
+
+            logging.info(f"PDF QR code generated and stored for PDF ID: {pdf_id}")
+
+        except Exception as qr_err:
+            logger.error(f"Error generating or storing PDF QR code for PDF ID {pdf_id}: {qr_err}")
+            # This is not a critical error that should stop the whole upload,
+            # but we should log it and potentially set a status indicating a partial failure.
+            # For now, we'll just log and continue.
+            if str(pdf_id) in conversion_progress:
+                 conversion_progress[str(pdf_id)]["status"] = "complete_with_qr_error"
+
 
         # Redirect back to the dashboard with a success message
         response = RedirectResponse(url="/dashboard", status_code=303)
         set_flash_message(response, "Your presentation was uploaded successfully!")
+        
+        # Mark process as complete
+        if str(pdf_id) in conversion_progress and conversion_progress[str(pdf_id)]["status"] != "complete_with_qr_error":
+             conversion_progress[str(pdf_id)]["status"] = "complete"
+
         return response
 
     except Exception as e:
@@ -300,6 +370,8 @@ async def upload_pptx(
         # Update progress with error
         if upload_id in conversion_progress:
             conversion_progress[upload_id]["status"] = "error"
+        elif str(pdf_id) in conversion_progress: # Check if upload_id was replaced by pdf_id
+             conversion_progress[str(pdf_id)]["status"] = "error"
         
         # Return a more specific error message
         if isinstance(e, HTTPException):
@@ -753,31 +825,39 @@ async def generate_set(
         
         # Get the set ID (we'll need to insert the record first)
         cursor = db.cursor()
+        
+        # Generate a unique code for this set
+        set_unique_code = str(uuid.uuid4())
+        
         cursor.execute(
             """
             INSERT INTO `set`
-            (name, pdf_id, user_id, sas_token, sas_token_expiry, slide_count)
-            VALUES (%s, %s, %s, %s, %s, %s)
+            (name, pdf_id, user_id, url, sas_token, sas_token_expiry, slide_count, unique_code)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 set_name,
                 pdf_id,
                 user_id,
+                pdf_url,
                 pdf_sas_token,
                 pdf_sas_token_expiry,
-                len(images)  # Store the number of slides in the set
+                len(images),  # Store the number of slides in the set
+                set_unique_code # Add the unique code
             )
         )
         db.commit()
         set_id = cursor.lastrowid
         
-        # Generate the QR code with the direct URL to the PDF
-        link_with_sas = f"{pdf_url}?{pdf_sas_token}"
+        # Generate the QR code using the unique code
+        # link_with_sas = f"{pdf_url}?{pdf_sas_token}" # No longer needed for QR generation
         qr_code_url, qr_code_sas_token, qr_code_sas_token_expiry = generate_qr(
-            link_with_sas=link_with_sas,
+            # link_with_sas=link_with_sas, # No longer needed
             user_alias=user_alias,
-            pdf_id=pdf_id,
-            set_name=set_name
+            pdf_id=pdf_id, # Keep pdf_id for blob naming
+            set_id=set_id, # Pass set_id for blob naming
+            set_name=set_name, # Pass set_name for blob naming
+            set_unique_code=set_unique_code # Pass the unique code
         )
         
         logging.info(f"QR code generated at {qr_code_url}")
@@ -853,3 +933,64 @@ async def generate_set(
                 cursor.close()
             except Exception as cursor_err:
                 logger.error(f"Error closing cursor: {str(cursor_err)}")
+
+def update_slide_count(db, set_id):
+    """
+    Updates the slide_count for a given set in the database.
+    """
+    cursor = db.cursor()
+    cursor.execute(
+        """
+        UPDATE `set` 
+        SET slide_count = (SELECT COUNT(*) FROM set_image WHERE set_id = %s)
+        WHERE set_id = %s
+        """,
+        (set_id, set_id)
+    )
+    db.commit()
+    cursor.close()
+
+# Example usage in add/remove image logic
+# After adding an image to a set
+# After removing an image from a set
+
+@converter.post("/add-image-to-set/{set_id}")
+async def add_image_to_set(
+    set_id: int,
+    image_id: int,
+    db: mysql.connector.connection.MySQLConnection = Depends(get_db)
+):
+    """
+    Adds an image to a set and updates the slide count.
+    """
+    cursor = db.cursor()
+    cursor.execute(
+        "INSERT INTO set_image (set_id, image_id, display_order) VALUES (%s, %s, %s)",
+        (set_id, image_id, 0)  # Assuming display_order is 0 for simplicity
+    )
+    db.commit()
+    cursor.close()
+
+    # Update slide count
+    update_slide_count(db, set_id)
+
+
+@converter.post("/remove-image-from-set/{set_id}")
+async def remove_image_from_set(
+    set_id: int,
+    image_id: int,
+    db: mysql.connector.connection.MySQLConnection = Depends(get_db)
+):
+    """
+    Removes an image from a set and updates the slide count.
+    """
+    cursor = db.cursor()
+    cursor.execute(
+        "DELETE FROM set_image WHERE set_id = %s AND image_id = %s",
+        (set_id, image_id)
+    )
+    db.commit()
+    cursor.close()
+
+    # Update slide count
+    update_slide_count(db, set_id)

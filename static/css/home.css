@@ -68,7 +68,6 @@
     transform: translateY(0);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     border-radius: 12px;
-    overflow: hidden;
     height: 550px; /* Increased fixed height for consistent size */
     display: flex; /* Use flexbox to manage height of children */
     flex-direction: column; /* Stack card-header and card-body vertically */
@@ -114,7 +113,7 @@
 }
 
 .btn-google {
-    background-color: #0D652D; /* Google green */
+    background-color: #EA4335; /* Google red */
 }
 
 .btn-linkedin {
@@ -206,7 +205,7 @@
     height: 2px;
     width: 66%;
     background-color: var(--primary-color);
-    margin: 2rem auto;
+    margin: 1rem auto;
     opacity: 0.2;
 }
 
@@ -347,7 +346,7 @@
 
 /* Ensure consistent tab pane height */
 .tab-pane {
-    min-height: 320px;
+    /* min-height: 320px; */
 }
 
 /* Container for How It Works Section */

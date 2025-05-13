@@ -263,7 +263,7 @@
                                     <a href="/select-slides/{{ presentation.pdf_id }}" class="btn btn-primary btn-sm flex-grow-1">
                                         <i class="fas fa-images me-1"></i> Create new set
                                     </a>
-                                    <a href="#" class="btn btn-outline-secondary btn-sm flex-grow-1 download-qr-btn" data-pdf-id="{{ presentation.pdf_id }}" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                    <a href="/download-qr/pdf/{{ presentation.pdf_id }}" class="btn btn-outline-secondary btn-sm flex-grow-1 download-qr-btn" data-pdf-id="{{ presentation.pdf_id }}" download style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
                                         <i class="fas fa-qrcode me-1"></i> Download QR Code for PDF file
                                     </a>
                                 </div>
@@ -281,7 +281,7 @@
                                                     {{ set.name }}
                                                     <div><small class="text-muted"><strong>Slides:</strong> {{ set.slide_count|default(0) }} | <strong>Downloaded:</strong> {{ set.download_count|default(0) }} times</small></div>
                                                 </div>
-                                                <a href="{{ set.qrcode_url_with_sas }}" class="btn btn-outline-primary btn-sm set-download-btn" data-set-id="{{ set.set_id }}" download>
+                                                <a href="/download-qr/set/{{ set.set_id }}" class="btn btn-outline-primary btn-sm set-download-btn" data-set-id="{{ set.set_id }}" download>
                                                     <i class="fas fa-qrcode"></i> {# Download QR icon #}
                                                 </a>
                                             </li>

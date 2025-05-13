@@ -16,7 +16,7 @@ from helpers.blob_op import refresh_sas_token_if_needed
 load_dotenv()
 
 import os
-from api import converter, users, qrcode, system, feedback
+from api import converter, users, qrcode, system, feedback, secure_links
 from core.main_converter import conversion_progress as pdf_conversion_progress
 
 # Configure logging
@@ -80,6 +80,7 @@ app.include_router(users.users)
 app.include_router(qrcode.qrcode) # Include the QR code router
 app.include_router(system.system, prefix="/api/system")
 app.include_router(feedback.feedback) # Include the feedback router
+app.include_router(secure_links.secure_links) # Include the secure links router
 
 # Initialize templates
 templates = Jinja2Templates(directory="templates")
@@ -477,10 +478,11 @@ async def dashboard(request: Request, db: mysql.connector.connection.MySQLConnec
     
     user_alias = user_data['alias']
 
-    # Fetch presentations and associated sets using LEFT JOIN
+    # Fetch presentations and associated sets using LEFT JOIN, including PDF QR code info
     cursor.execute("""
         SELECT pdf.pdf_id, pdf.original_filename, pdf.url, pdf.sas_token, pdf.sas_token_expiry AS uploaded_on,
                pdf.num_slides, pdf.file_size_kb, pdf.download_count,
+               pdf.pdf_qrcode_url, pdf.pdf_qrcode_sas_token, pdf.pdf_qrcode_sas_token_expiry,
                `set`.set_id, `set`.name AS set_name, `set`.qrcode_url, `set`.qrcode_sas_token,
                `set`.download_count AS set_download_count, `set`.slide_count
         FROM pdf

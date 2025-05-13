@@ -137,6 +137,64 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 
+    // Function to handle QR code download via JavaScript
+    async function downloadQrCode(button, url, filename) {
+        try {
+            // Show a simple loading indicator while maintaining button width
+            const originalWidth = button.offsetWidth;
+            button.style.width = originalWidth + 'px'; // Fix the width
+            button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Downloading...';
+            button.disabled = true;
+
+            // Add cache-busting parameter to prevent browser caching
+            const cacheBuster = `?cache=${Date.now()}`;
+            const urlWithCacheBuster = url.includes('?') ? `${url}&cache=${Date.now()}` : `${url}${cacheBuster}`;
+
+            const response = await fetch(urlWithCacheBuster, {
+                headers: {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                }
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP error! status: ${response.status}, detail: ${errorText}`);
+            }
+
+            const blob = await response.blob();
+
+            // Create a link element and trigger the download
+            const blobUrl = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = blobUrl;
+            a.download = filename; // Set desired filename
+            document.body.appendChild(a);
+            a.click();
+
+            // Clean up
+            window.URL.revokeObjectURL(blobUrl);
+            a.remove();
+
+        } catch (error) {
+            console.error('Error downloading QR code:', error);
+            alert('Failed to download QR code. Please try again.');
+        } finally {
+            // Restore button state
+            // Need to determine the original button content based on class
+            if (button.classList.contains('download-qr-btn')) {
+                 button.innerHTML = '<i class="fas fa-qrcode me-1"></i> Download QR Code for PDF file';
+            } else if (button.classList.contains('set-download-btn')) {
+                 button.innerHTML = '<i class="fas fa-qrcode"></i>';
+            }
+            button.disabled = false;
+            button.style.width = ''; // Remove fixed width
+        }
+    }
+
+
     // QR code download functionality for PDF presentations
     const downloadQrButtons = document.querySelectorAll('.download-qr-btn');
     if (downloadQrButtons.length > 0) {
@@ -148,10 +206,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 const filenameElement = this.closest('.card').querySelector('.card-header h3');
                 let originalFilename = 'presentation'; // Default filename
                 if (filenameElement) {
-                    originalFilename = filenameElement.textContent.trim(); // Get filename from h3
+                    // Extract filename from the text content, removing "Presentation X/Y" and trimming
+                    const textContent = filenameElement.textContent.trim();
+                    const match = textContent.match(/Presentation \d+\/\d+\s*(.*)/);
+                    if (match && match[1]) {
+                         originalFilename = match[1].trim();
+                    } else {
+                         originalFilename = textContent; // Fallback if format changes
+                    }
                 }
                 const baseFilename = originalFilename.replace(/\.[^/.]+$/, ""); // Remove extension
-                
+                const filename = `${baseFilename}_pdf_qr.png`; // Set desired filename
+
                 // Increment the download count
                 try {
                     fetch(`/increment-pdf-download/${pdfId}`, {
@@ -165,60 +231,34 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Continue with download even if tracking fails
                 }
 
-                try {
-                    // Show a simple loading indicator while maintaining button width
-                    const originalWidth = button.offsetWidth;
-                    button.style.width = originalWidth + 'px'; // Fix the width
-                    button.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Generating...';
-                    button.disabled = true;
-
-                    const response = await fetch(`/generate-pdf-qr/${pdfId}`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json', // Or appropriate content type if sending a body
-                        },
-                        // If you need to send any data in the body, add it here:
-                        // body: JSON.stringify({ key: 'value' }),
-                    });
-
-                    if (!response.ok) {
-                        const errorText = await response.text();
-                        throw new Error(`HTTP error! status: ${response.status}, detail: ${errorText}`);
-                    }
-
-                    const blob = await response.blob();
-
-                    // Create a link element and trigger the download
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.style.display = 'none';
-                    a.href = url;
-                    a.download = `${baseFilename}_qr.png`; // Set desired filename
-                    document.body.appendChild(a);
-                    a.click();
-
-                    // Clean up
-                    window.URL.revokeObjectURL(url);
-                    a.remove();
-
-                } catch (error) {
-                    console.error('Error downloading QR code:', error);
-                    alert('Failed to generate or download QR code. Please try again.');
-                } finally {
-                    // Restore button state
-                    button.innerHTML = '<i class="fas fa-qrcode me-1"></i> Download QR Code for PDF file';
-                    button.disabled = false;
+                // Use the generic download function with the URL from the href attribute
+                const qrCodeUrl = this.href;
+                if (qrCodeUrl && qrCodeUrl !== '#') {
+                    await downloadQrCode(button, qrCodeUrl, filename);
+                } else {
+                    alert('QR code URL not available.');
                 }
             });
         });
     }
     
-    // Set download tracking
+    // Set download functionality and tracking
     const setDownloadButtons = document.querySelectorAll('.set-download-btn');
     if (setDownloadButtons.length > 0) {
         setDownloadButtons.forEach(button => {
-            button.addEventListener('click', function() {
+            button.addEventListener('click', async function(e) {
+                e.preventDefault(); // Prevent default link behavior
+
                 const setId = this.dataset.setId;
+                const qrCodeUrl = this.href; // Get the QR code URL from the href
+                 const filenameElement = this.closest('.list-group-item').querySelector('div h6'); // Assuming set name is in h6
+                 let setFilename = 'set'; // Default filename
+                 if (filenameElement) {
+                     setFilename = filenameElement.textContent.trim().replace(/\s+/g, '_').toLowerCase(); // Get set name and format for filename
+                 }
+                 const filename = `${setFilename}_qr.png`; // Set desired filename
+
+
                 if (setId) {
                     // Increment the download count
                     try {
@@ -232,6 +272,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         console.error('Error incrementing set download count:', error);
                         // Continue with download even if tracking fails
                     }
+                }
+
+                // Use the generic download function
+                if (qrCodeUrl && qrCodeUrl !== '#') {
+                    await downloadQrCode(button, qrCodeUrl, filename);
+                } else {
+                    alert('QR code URL not available.');
                 }
             });
         });

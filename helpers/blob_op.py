@@ -100,6 +100,8 @@ def refresh_sas_token_if_needed(alias, file_path, current_sas_token=None, sas_to
         content_disposition=content_disposition
     )
 
+import logging
+
 def upload_to_blob(blob_name, file_content, content_type, user_alias, content_disposition=None):
     """
     Uploads any file to Azure Blob Storage and returns access information.
@@ -112,6 +114,8 @@ def upload_to_blob(blob_name, file_content, content_type, user_alias, content_di
     We use this for everything - PDFs, images, thumbnails, QR codes, etc.
     """
     try:
+        logging.info(f"Uploading blob: {blob_name}, content type: {content_type}, user: {user_alias}")
+        
         # First, get a SAS token that will allow access to this file
         sas_token, sas_token_expiry = generate_sas_token_for_file(
             alias=user_alias,
@@ -129,17 +133,31 @@ def upload_to_blob(blob_name, file_content, content_type, user_alias, content_di
         # Create a client for uploading to this specific blob
         blob_client = BlobClient.from_blob_url(blob_url_with_sas)
 
-        # Upload the file with the right content type
+        # Create content settings with the proper content type and content disposition
+        content_settings = ContentSettings(
+            content_type=content_type
+        )
+        
+        # Add content disposition if provided
+        if content_disposition:
+            content_settings.content_disposition = content_disposition
+            logging.info(f"Setting Content-Disposition: {content_disposition}")
+
+        # Upload the file with the right content type and content disposition
         # We use BlockBlob for all our files since they're relatively small
         blob_client.upload_blob(
             file_content,
             blob_type="BlockBlob",
             overwrite=True,  # Replace if a file with this name already exists
-            content_settings=ContentSettings(content_type=content_type)
+            content_settings=content_settings
         )
 
+        logging.info(f"Successfully uploaded blob to {blob_url}")
+        
         # Return everything the app needs to access this file later
         return blob_url, sas_token, sas_token_expiry
     except Exception as e:
+        # Log the error with detailed information
+        logging.error(f"Error uploading blob {blob_name} for user {user_alias}: {e}")
         # If anything goes wrong, provide a helpful error message
         raise Exception(f"Couldn't upload file to Azure: {e}")

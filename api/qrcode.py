@@ -38,95 +38,141 @@ templates = Jinja2Templates(directory="templates")
 #     qr_code_path = generate_qr_code("static/temp")  # Directory with images
 #     return templates.TemplateResponse("qr-code.html", {"request": request, "qr_code_path": qr_code_path})
 
-@qrcode.post("/generate-pdf-qr/{pdf_id}")
-async def generate_pdf_qr(
-    pdf_id: int,
+@qrcode.get("/download-qr/{type}/{id}")
+async def download_qr(
+    type: str,
+    id: int,
     request: Request,
     db: mysql.connector.connection.MySQLConnection = Depends(get_db)
 ):
     """
-    Generates a QR code for the entire PDF presentation.
-    The QR code will point to a tracking endpoint that increments the download count.
+    Serves QR code images with proper Content-Disposition headers to force download.
     
-    This endpoint also checks if the SAS token is expired and refreshes it if needed.
+    This endpoint fetches the QR code from Azure Blob Storage and serves it with
+    headers that force the browser to download it rather than display it.
+    
+    Args:
+        type: Either 'pdf' or 'set' to indicate which type of QR code to download
+        id: The ID of the PDF or set
     """
     cursor = None
     try:
-        # Get the PDF URL, SAS token, and expiry date from the database
-        cursor = db.cursor(dictionary=True)
-        cursor.execute(
-            "SELECT url, sas_token, sas_token_expiry FROM pdf WHERE pdf_id = %s",
-            (pdf_id,)
-        )
-        pdf_data = cursor.fetchone()
-
-        if not pdf_data:
-            raise HTTPException(status_code=404, detail="PDF presentation not found")
-
-        # Get user alias for file organization
+        # Get the user's ID from the session
         user_id = request.session.get('user_id')
         if not user_id:
-             raise HTTPException(status_code=401, detail="User not authenticated")
-
+            raise HTTPException(status_code=401, detail="User not authenticated")
+        
+        # Get the user's alias
+        cursor = db.cursor(dictionary=True)
         cursor.execute("SELECT alias FROM user WHERE user_id = %s", (user_id,))
         user_data = cursor.fetchone()
         if not user_data or 'alias' not in user_data:
             raise HTTPException(status_code=404, detail="User alias not found")
         user_alias = user_data['alias']
-
-        # Check if the SAS token is expired and refresh if needed
-        pdf_url = pdf_data['url']
-        current_sas_token = pdf_data['sas_token']
-        sas_token_expiry = pdf_data['sas_token_expiry']
         
-        # Extract the file path from the URL
-        url_parts = pdf_url.split('/')
-        file_path = '/'.join(url_parts[4:])  # Skip the protocol and domain parts
-        
-        # Check if token is expired and refresh if needed
-        if sas_token_expiry is None or datetime.now(timezone.utc) >= sas_token_expiry:
-            logging.info(f"Refreshing expired SAS token for PDF {pdf_id} during QR code generation")
-            new_token, new_expiry = refresh_sas_token_if_needed(
-                alias=user_alias,
-                file_path=file_path,
-                current_sas_token=current_sas_token,
-                sas_token_expiry=sas_token_expiry
+        # Get the QR code URL and SAS token based on the type
+        if type == 'pdf':
+            cursor.execute(
+                "SELECT pdf_qrcode_url, pdf_qrcode_sas_token, original_filename FROM pdf WHERE pdf_id = %s AND user_id = %s",
+                (id, user_id)
             )
+            qr_data = cursor.fetchone()
+            if not qr_data:
+                raise HTTPException(status_code=404, detail="PDF QR code not found")
             
-            # Update the database with the new token
-            update_cursor = db.cursor()
-            update_cursor.execute(
-                "UPDATE pdf SET sas_token = %s, sas_token_expiry = %s WHERE pdf_id = %s",
-                (new_token, new_expiry, pdf_id)
+            qr_url = qr_data['pdf_qrcode_url']
+            qr_sas_token = qr_data['pdf_qrcode_sas_token']
+            filename = qr_data['original_filename'].replace('.pptx', '').replace('.pdf', '')
+            download_filename = f"{filename}_qr.png"
+            
+        elif type == 'set':
+            cursor.execute(
+                "SELECT qrcode_url, qrcode_sas_token, name FROM `set` WHERE set_id = %s AND user_id = %s",
+                (id, user_id)
             )
-            db.commit()
-            update_cursor.close()
+            qr_data = cursor.fetchone()
+            if not qr_data:
+                raise HTTPException(status_code=404, detail="Set QR code not found")
             
-            # Use the new token
-            full_pdf_url = f"{pdf_url}?{new_token}"
+            qr_url = qr_data['qrcode_url']
+            qr_sas_token = qr_data['qrcode_sas_token']
+            download_filename = f"{qr_data['name']}_qr.png"
+            
         else:
-            # Token is still valid, use the existing one
-            full_pdf_url = f"{pdf_url}?{current_sas_token}"
+            raise HTTPException(status_code=400, detail="Invalid QR code type")
         
-        # Generate the QR code with the direct URL to the PDF
-        qr_code_url, qr_code_sas_token, qr_code_sas_token_expiry = generate_qr(
-            link_with_sas=full_pdf_url,
-            user_alias=user_alias,
-            pdf_id=pdf_id,
-            set_name="full_pdf" # Use a default name for the full PDF QR
-        )
-
-        # Download the generated QR code image from Azure
-        full_qr_code_url = f"{qr_code_url}?{qr_code_sas_token}"
-        blob_client = BlobClient.from_blob_url(full_qr_code_url)
-        qr_code_bytes = blob_client.download_blob().readall()
-
-        # Return the QR code image as a response
-        return StreamingResponse(io.BytesIO(qr_code_bytes), media_type="image/png")
-
+        # Fetch the QR code from Azure Blob Storage
+        full_qr_url = f"{qr_url}?{qr_sas_token}"
+        try:
+            blob_client = BlobClient.from_blob_url(full_qr_url)
+            qr_code_bytes = blob_client.download_blob().readall()
+        except Exception as e:
+            logging.error(f"Error downloading QR code from Azure: {e}")
+            
+            # If the QR code doesn't exist, regenerate it
+            if type == 'pdf':
+                logging.info(f"QR code not found for PDF {id}, regenerating...")
+                
+                # Get the PDF URL and SAS token
+                cursor.execute(
+                    "SELECT url, sas_token, original_filename FROM pdf WHERE pdf_id = %s",
+                    (id,)
+                )
+                pdf_data = cursor.fetchone()
+                if not pdf_data:
+                    raise HTTPException(status_code=404, detail="PDF not found")
+                
+                # Generate a new QR code
+                full_pdf_url = f"{pdf_data['url']}?{pdf_data['sas_token']}"
+                qr_code_url, qr_code_sas_token, qr_code_sas_token_expiry = generate_qr(
+                    link_with_sas=full_pdf_url,
+                    user_alias=user_alias,
+                    pdf_id=id,
+                    set_name="full_pdf"
+                )
+                
+                # Update the database with the new QR code information
+                cursor.execute(
+                    """
+                    UPDATE pdf
+                    SET pdf_qrcode_url = %s, pdf_qrcode_sas_token = %s, pdf_qrcode_sas_token_expiry = %s
+                    WHERE pdf_id = %s
+                    """,
+                    (qr_code_url, qr_code_sas_token, qr_code_sas_token_expiry, id)
+                )
+                db.commit()
+                
+                # Try to fetch the newly generated QR code
+                try:
+                    full_qr_url = f"{qr_code_url}?{qr_code_sas_token}"
+                    blob_client = BlobClient.from_blob_url(full_qr_url)
+                    qr_code_bytes = blob_client.download_blob().readall()
+                    
+                    # Update the filename for the download
+                    filename = pdf_data['original_filename'].replace('.pptx', '').replace('.pdf', '')
+                    download_filename = f"{filename}_qr.png"
+                    
+                    logging.info(f"Successfully regenerated QR code for PDF {id}")
+                except Exception as fetch_err:
+                    logging.error(f"Error fetching regenerated QR code: {fetch_err}")
+                    raise HTTPException(status_code=500, detail="Error generating QR code")
+            else:
+                # For sets, we can't easily regenerate the QR code without knowing the slides
+                raise HTTPException(status_code=404, detail="QR code not found")
+        
+        # Return the QR code with headers that force download
+        response = StreamingResponse(io.BytesIO(qr_code_bytes), media_type="image/png")
+        response.headers["Content-Disposition"] = f'attachment; filename="{download_filename}"'
+        response.headers["Content-Type"] = "image/png"
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        
+        return response
+        
     except Exception as e:
-        print(f"Error generating PDF QR code: {e}")
-        raise HTTPException(status_code=500, detail="Error generating QR code")
+        logging.error(f"Error in download_qr: {e}")
+        raise HTTPException(status_code=500, detail=f"Error downloading QR code: {str(e)}")
     finally:
         if cursor:
             cursor.close()
