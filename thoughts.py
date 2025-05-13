@@ -12,6 +12,7 @@
 # Implement Apple Login
 # Implement LinkedIn Login
 # Mention SAS Token 
+## Seems to be some issues with the conversion sizes, the sets are 10 times larger than the originals
 
 
 
