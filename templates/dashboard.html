@@ -51,7 +51,7 @@
     <div class="col-lg-6">
         <div class="card bg-light-gray card-navy-shadow card-navy-border h-100 container-border">
             <div class="card-body d-flex flex-column">
-                <h1 class="mb-2">Welcome, @{{ email.split('@')[0] }}!</h1>
+                <h1 class="mb-2">Welcome, {{ email.split('@')[0] }}!</h1>
                 <div class="d-flex flex-wrap mb-1">
                     <span class="badge bg-secondary me-2 mb-2">Member since: {{ member_since }}</span>
                     {% if premium_status %}

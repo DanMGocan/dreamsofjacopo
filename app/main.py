@@ -513,7 +513,14 @@ async def dashboard(request: Request, db: mysql.connector.connection.MySQLConnec
                 file_path = '/'.join(url_parts[4:])  # Skip the protocol and domain parts
                 
                 # Check if token is expired and refresh if needed
-                if sas_token_expiry is None or datetime.now(timezone.utc) >= sas_token_expiry:
+                # Ensure both datetimes are timezone-aware before comparison
+                current_time = datetime.now(timezone.utc)
+                
+                # If sas_token_expiry is naive (has no timezone), assume it's in UTC
+                if sas_token_expiry is not None and sas_token_expiry.tzinfo is None:
+                    sas_token_expiry = sas_token_expiry.replace(tzinfo=timezone.utc)
+                
+                if sas_token_expiry is None or current_time >= sas_token_expiry:
                     logging.info(f"Refreshing expired SAS token for PDF {pdf_id}")
                     new_token, new_expiry = refresh_sas_token_if_needed(
                         alias=user_alias,
@@ -668,7 +675,14 @@ async def download_pdf(pdf_id: int, request: Request, db: mysql.connector.connec
         file_path = '/'.join(url_parts[4:])  # Skip the protocol and domain parts
         
         # Check if token is expired and refresh if needed
-        if sas_token_expiry is None or datetime.now(timezone.utc) >= sas_token_expiry:
+        # Ensure both datetimes are timezone-aware before comparison
+        current_time = datetime.now(timezone.utc)
+        
+        # If sas_token_expiry is naive (has no timezone), assume it's in UTC
+        if sas_token_expiry is not None and sas_token_expiry.tzinfo is None:
+            sas_token_expiry = sas_token_expiry.replace(tzinfo=timezone.utc)
+        
+        if sas_token_expiry is None or current_time >= sas_token_expiry:
             logging.info(f"Refreshing expired SAS token for PDF {pdf_id} during download")
             new_token, new_expiry = refresh_sas_token_if_needed(
                 alias=user_alias,
