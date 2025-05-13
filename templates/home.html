@@ -2,6 +2,10 @@
 
 {% block title %}Home | SlidePull{% endblock %}
 
+{% block head %}
+<script src="https://www.google.com/recaptcha/api.js" async defer></script>
+{% endblock %}
+
 {% block content %}
 <!-- Hero Section -->
 <div class="hero-container">
@@ -112,6 +116,9 @@ Say goodbye to bulky email attachments and compatibility issues. Say goodbye to 
                                 </div>
                                 <div class="mb-3">
                                     <div id="password-mismatch-error" class="text-danger" style="display: none;">Passwords do not match.</div>
+                                </div>
+                                <div class="d-grid">
+                                    <div class="g-recaptcha" data-sitekey="YOUR_SITE_KEY"></div>
                                 </div>
                                 <div class="d-grid">
                                     <button type="submit" class="btn btn-primary">

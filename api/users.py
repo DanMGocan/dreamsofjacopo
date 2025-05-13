@@ -15,6 +15,7 @@ from helpers.user_utils import authenticate_user
 from authlib.integrations.starlette_client import OAuth
 from starlette.config import Config
 import uuid
+import requests # Import the requests library
 
 import os
 
@@ -26,6 +27,10 @@ serializer = URLSafeTimedSerializer(SECRET_KEY)
 users = APIRouter()
 
 templates = Jinja2Templates(directory="templates")
+
+# Get reCAPTCHA keys from environment variables
+RECAPTCHA_SITE_KEY = os.getenv('RECAPTCHA_SITE_KEY')
+RECAPTCHA_SECRET_KEY = os.getenv('RECAPTCHA_SECRET_KEY')
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -63,9 +68,38 @@ async def create_account(
     form = await request.form()
     email = form.get("email")
     password = form.get("password")
+    recaptcha_response = form.get("g-recaptcha-response") # Get the reCAPTCHA response
 
     if not email or not password:
         raise HTTPException(status_code=400, detail="Email and password are required")
+
+    # Verify reCAPTCHA
+    if not RECAPTCHA_SECRET_KEY:
+        print("RECAPTCHA_SECRET_KEY not set in environment variables.")
+        raise HTTPException(status_code=500, detail="Server configuration error: reCAPTCHA secret key not set.")
+
+    if not recaptcha_response:
+        raise HTTPException(status_code=400, detail="Please complete the reCAPTCHA.")
+
+    captcha_verify_url = "https://www.google.com/recaptcha/api/siteverify"
+    captcha_data = {
+        "secret": RECAPTCHA_SECRET_KEY,
+        "response": recaptcha_response
+    }
+
+    try:
+        response = requests.post(captcha_verify_url, data=captcha_data)
+        response.raise_for_status() # Raise an exception for bad status codes
+        result = response.json()
+
+        if not result.get("success"):
+            print(f"reCAPTCHA verification failed: {result.get('error-codes')}")
+            raise HTTPException(status_code=400, detail="reCAPTCHA verification failed. Please try again.")
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error verifying reCAPTCHA: {e}")
+        raise HTTPException(status_code=500, detail="Error verifying reCAPTCHA. Please try again later.")
+
 
     # Hash the password
     hashed_password = pwd_context.hash(password)

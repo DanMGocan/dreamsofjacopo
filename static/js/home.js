@@ -40,14 +40,36 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (registrationForm && passwordInput && confirmPasswordInput && passwordMismatchError) {
         registrationForm.addEventListener('submit', function(event) {
+            event.preventDefault(); // Prevent default form submission
+
+            // Password confirmation validation
             if (passwordInput.value !== confirmPasswordInput.value) {
-                event.preventDefault(); // Prevent form submission
                 passwordMismatchError.style.display = 'block'; // Show error message
                 confirmPasswordInput.classList.add('is-invalid'); // Add red border
+                return; // Stop the submission process
             } else {
                 passwordMismatchError.style.display = 'none'; // Hide error message
                 confirmPasswordInput.classList.remove('is-invalid'); // Remove red border
             }
+
+            // reCAPTCHA verification
+            const recaptchaResponse = grecaptcha.getResponse();
+
+            if (!recaptchaResponse) {
+                // Display an error message to the user (you might want a dedicated div for this)
+                alert("Please complete the reCAPTCHA.");
+                return; // Stop the submission process
+            }
+
+            // Add the reCAPTCHA response to the form data
+            const hiddenInput = document.createElement('input');
+            hiddenInput.type = 'hidden';
+            hiddenInput.name = 'g-recaptcha-response';
+            hiddenInput.value = recaptchaResponse;
+            registrationForm.appendChild(hiddenInput);
+
+            // Submit the form manually
+            registrationForm.submit();
         });
 
         // Optional: Hide error message when user starts typing again

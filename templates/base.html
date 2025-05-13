@@ -27,6 +27,7 @@
     
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ request.url_for('static', path='css/base.css') }}">
+    {% block head %}{% endblock %} {# Add head block here #}
 </head>
 <body class="d-flex flex-column min-vh-100" {% block body_attributes %}{% endblock %}>
     <!-- Navbar -->
