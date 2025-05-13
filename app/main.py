@@ -30,6 +30,9 @@ logging.basicConfig(level=logging.INFO,
 # Create an instance of FastAPI with custom 404 handler
 app = FastAPI(docs_url=None, redoc_url=None)
 
+# Add reCAPTCHA site key to app state for use in templates
+app.state.RECAPTCHA_SITE_KEY = os.getenv('RECAPTCHA_SITE_KEY')
+
 # Custom exception handlers
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc):
