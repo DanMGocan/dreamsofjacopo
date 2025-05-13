@@ -3,7 +3,6 @@
     position: relative;
     padding: 3rem 0;
     overflow: hidden;
-    margin-bottom: 3rem;
 }
 
 .hero-content {
@@ -202,12 +201,20 @@
     }
 }
 
+/* Section Divider */
+.section-divider {
+    height: 2px;
+    width: 66%;
+    background-color: var(--primary-color);
+    margin: 2rem auto;
+    opacity: 0.2;
+}
+
 /* How It Works Section */
 .how-it-works-section {
-    padding: 4rem 0;
+    padding: 1rem 0 2rem;
     background-color: var(--light-gray);
     border-radius: 20px;
-    margin: 3rem 0;
 }
 
 .how-it-works-section h2 {

@@ -23,7 +23,6 @@ body {
     overflow: visible;
 }
 
-
 .navbar-brand {
     font-weight: 700;
     font-size: 1.75rem;
@@ -272,17 +271,30 @@ footer {
 }
 
 .card-navy-border {
-    border: 2px solid var(--primary-color) !important; /* Navy blue border */
+    border: 2px solid var(--primary-color) !important;
 }
 
 .card-navy-shadow {
-    box-shadow: 0 8px 16px rgba(0, 48, 143, 0.3) !important; /* Stronger navy blue shadow */
+    box-shadow: 0 8px 16px rgba(0, 48, 143, 0.3) !important;
 }
 
 .container-border {
-    border: 2px solid var(--primary-color); /* Thin blue border */
+    border: 2px solid var(--primary-color);
 }
 
 .row.g-4 .col .card {
-    border: 1px solid var(--primary-color) !important; /* 1px navy blue border for presentation slots */
+    border: 1px solid var(--primary-color) !important;
+}
+
+/* Navbar brand subtitle styling */
+#navbar-brand-subtitle {
+    font-size: 0.4em;
+    vertical-align: middle;
+    display: inline-block;
+    margin-left: 0.5em;
+}
+
+#navbar-brand-subtitle i {
+    vertical-align: middle;
+    margin: 0 0.1em;
 }
