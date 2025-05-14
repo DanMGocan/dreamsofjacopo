@@ -762,6 +762,9 @@ async def generate_set(
         logging.info("Packaging slides into a PDF file")
         pdf_buffer = io.BytesIO()
         pdf_document = fitz.open()  # Create a new empty PDF
+        
+        # Import PIL for image processing
+        from PIL import Image
 
         for idx, image in enumerate(images):
             try:
@@ -778,14 +781,32 @@ async def generate_set(
                 # Create a temporary image file in memory
                 img_stream = io.BytesIO(blob_data)
                 
+                # Process the image to reduce size
+                pil_image = Image.open(img_stream)
+                
+                # Resize to a lower resolution if larger than max_width
+                max_width = 1024
+                if pil_image.width > max_width:
+                    ratio = max_width / pil_image.width
+                    new_height = int(pil_image.height * ratio)
+                    pil_image = pil_image.resize((max_width, new_height), Image.LANCZOS)
+                
+                # Convert to JPEG with reduced quality
+                resized_img_stream = io.BytesIO()
+                # Convert RGBA to RGB if needed (JPEG doesn't support alpha channel)
+                if pil_image.mode == 'RGBA':
+                    pil_image = pil_image.convert('RGB')
+                pil_image.save(resized_img_stream, format="JPEG", quality=75)  # Lower quality (0-100)
+                resized_img_stream.seek(0)
+                
                 # Add the image as a new page to the PDF
                 # Create a new page with appropriate dimensions
-                img = fitz.open(stream=img_stream, filetype="png")
+                img = fitz.open(stream=resized_img_stream, filetype="jpeg")
                 rect = img[0].rect  # Get the rectangle representing the image size
                 page = pdf_document.new_page(width=rect.width, height=rect.height)
                 
-                # Insert the image onto the page
-                page.insert_image(rect, stream=blob_data)
+                # Insert the optimized image onto the page
+                page.insert_image(rect, stream=resized_img_stream.getvalue())
                 img.close()
                 
                 # Update progress (using 1-based indexing for better user display)
@@ -796,8 +817,12 @@ async def generate_set(
                 conversion_progress[str_pdf_id]["status"] = "error"
                 raise Exception(f"Could not process one of your selected slides. Please try again.")
 
-        # Save the PDF to the buffer
-        pdf_document.save(pdf_buffer)
+        # Save the PDF to the buffer with compression options
+        pdf_buffer = io.BytesIO()
+        pdf_document.save(pdf_buffer, 
+                         garbage=4,  # Maximum garbage collection
+                         deflate=True,  # Use deflate compression
+                         clean=True)  # Clean unused objects
         pdf_document.close()
         pdf_buffer.seek(0)
 

@@ -12,7 +12,6 @@
 # Implement Apple Login
 # Implement LinkedIn Login
 # Mention SAS Token 
-## Seems to be some issues with the conversion sizes, the sets are 10 times larger than the originals
 
 
 
@@ -21,4 +20,5 @@
 # Impose password verifications when registering 
 ### The SAS tokens for the QR codes are not automatically refreshed and they expire after a week
 ### SAS tokens are exposed in the URL - must have a slidepull URL that points to the Azure Blob links
-# We need to remove the email address from the Dashboard and instead, cut the email address just before the @ so it still displays the name of the user. 
+# We need to remove the email address from the Dashboard and instead, cut the email address just before the @ so it still displays the name of the user.
+## Fixed issue with set sizes being much larger than original presentations by implementing image resizing and PDF compression
