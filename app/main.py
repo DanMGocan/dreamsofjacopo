@@ -124,10 +124,7 @@ async def about_page(request: Request):
     # Show the About page
     return templates.TemplateResponse("about.html", {"request": request})
 
-@app.get("/development", response_class=HTMLResponse)
-async def development_page(request: Request):
-    # Show the Development Updates page
-    return templates.TemplateResponse("development.html", {"request": request})
+# Removed /development route
 
 @app.get("/account", response_class=HTMLResponse)
 async def account_page(request: Request, db: mysql.connector.connection.MySQLConnection = Depends(get_db)):
@@ -143,8 +140,17 @@ async def account_page(request: Request, db: mysql.connector.connection.MySQLCon
     user_id = request.session['user_id']
     account_activated = request.session['account_activated']
     premium_status = request.session['premium_status']
-    member_since = request.session['member_since']
     
+    member_since_str = request.session.get('member_since')
+    formatted_member_since = 'N/A'
+    if member_since_str:
+        try:
+            dt_member_since = datetime.strptime(member_since_str, '%Y-%m-%d %H:%M:%S')
+            formatted_member_since = dt_member_since.strftime('%d/%m/%Y')
+        except ValueError:
+            logging.warning(f"Could not parse member_since string for /account: {member_since_str}")
+            formatted_member_since = member_since_str
+
     # Get login method from database
     cursor = db.cursor(dictionary=True)
     cursor.execute("SELECT login_method FROM user WHERE user_id = %s", (user_id,))
@@ -185,23 +191,27 @@ async def account_page(request: Request, db: mysql.connector.connection.MySQLCon
 
     total_downloads = pdf_downloads + set_downloads
     
-    # Get additional subscription information
-    cursor.execute("""
-        SELECT additional_presentations, additional_storage_days, additional_sets
-        FROM user
-        WHERE user_id = %s
-    """, (user_id,))
-    additional_info = cursor.fetchone()
+    # Removed query for additional_presentations, additional_storage_days, additional_sets
+    # as these columns no longer exist in the user table.
+    # additional_info = None 
     
     # Calculate next billing date (1 month after member_since date)
     # This is a simplified example - in a real app, you'd track actual subscription dates
     next_billing_date = None
     if premium_status > 0:
-        from datetime import datetime, timedelta
+        from datetime import timedelta # Import only timedelta, datetime is global
         try:
-            member_since_date = datetime.strptime(member_since, "%Y-%m-%d %H:%M:%S")
-            next_billing_date = (member_since_date + timedelta(days=30)).strftime("%Y-%m-%d")
-        except:
+            if member_since_str: # Check if member_since_str (original string from session) exists
+                # Use the globally imported datetime module
+                member_since_date_obj = datetime.strptime(member_since_str, "%Y-%m-%d %H:%M:%S")
+                next_billing_date = (member_since_date_obj + timedelta(days=30)).strftime("%Y-%m-%d")
+            else:
+                next_billing_date = "N/A" 
+        except ValueError as e: # Catch specific parsing errors
+            logging.error(f"Error calculating next_billing_date due to date parsing: {e}")
+            next_billing_date = "Unknown"
+        except Exception as e: # Catch other potential errors
+            logging.error(f"Unexpected error calculating next_billing_date: {e}")
             next_billing_date = "Unknown"
     
     cursor.close()
@@ -213,7 +223,7 @@ async def account_page(request: Request, db: mysql.connector.connection.MySQLCon
         "email": email,
         "account_activated": account_activated,
         "premium_status": premium_status,
-        "member_since": member_since,
+        "member_since": formatted_member_since, # Use formatted date
         "login_method": login_method,
         "presentations": presentations,
         "sets_count": sets_count,
@@ -452,7 +462,18 @@ async def dashboard(request: Request, db: mysql.connector.connection.MySQLConnec
     user_id = request.session['user_id']
     account_activated = request.session['account_activated']
     premium_status = request.session['premium_status']
-    member_since = request.session['member_since']
+    
+    member_since_str = request.session.get('member_since')
+    formatted_member_since = 'N/A'
+    if member_since_str:
+        try:
+            # Assuming member_since_str is in 'YYYY-MM-DD HH:MM:SS' format from session
+            dt_member_since = datetime.strptime(member_since_str, '%Y-%m-%d %H:%M:%S')
+            formatted_member_since = dt_member_since.strftime('%d/%m/%Y')
+        except ValueError:
+            # If parsing fails, use the original string or a default
+            logging.warning(f"Could not parse member_since string: {member_since_str}")
+            formatted_member_since = member_since_str # Fallback or keep 'N/A'
 
     # Check if there's a flash message to display
     flash_message = get_flash_message(request)
@@ -471,7 +492,7 @@ async def dashboard(request: Request, db: mysql.connector.connection.MySQLConnec
             "flash_message": "Error loading user data. Please contact support.",
             "account_activated": account_activated,
             "premium_status": premium_status,
-            "member_since": member_since,
+            "member_since": formatted_member_since, # Use formatted date
             "presentations": [],
             "is_admin": email in ADMIN_EMAILS
         })
@@ -622,7 +643,7 @@ async def dashboard(request: Request, db: mysql.connector.connection.MySQLConnec
         "flash_message": flash_message,
         "account_activated": account_activated,
         "premium_status": premium_status,
-        "member_since": member_since,
+        "member_since": formatted_member_since, # Use formatted date
         "presentations": presentations,  # Pass the list of presentations to the template
         "is_admin": is_admin  # Pass admin status to show/hide admin link
     })

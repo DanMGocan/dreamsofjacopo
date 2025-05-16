@@ -15,13 +15,33 @@ body {
     line-height: 1.6;
 }
 
+body::after {
+    content: '';
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100vw; /* Pseudo-element covers full width */
+    height: 100vh; /* Pseudo-element covers full height */
+    background-image: url('/static/media/img/test1.png');
+    background-repeat: no-repeat;
+    background-position: bottom left;
+    /* Adjusted size: 33% smaller than 80vw (80 * 0.67 = 53.6 -> 54vw) */
+    background-size: 54vw auto; 
+    opacity: 0.08; 
+    z-index: -2; /* Behind main content */
+    pointer-events: none; /* Non-interactive */
+}
+
 /* Navbar styling */
 .navbar {
     position: relative;
-    background-color: var(--primary-color) !important;
+    background-color: var(--primary-color) !important; /* Restored original background color */
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    overflow: visible;
+    overflow: visible; 
 }
+
+/* .navbar > .container align-items: stretch; was removed to revert to Bootstrap default */
+/* .navbar-custom-stripes CSS was removed */
 
 .navbar-brand {
     font-weight: 700;

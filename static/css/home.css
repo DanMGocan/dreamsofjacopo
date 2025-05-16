@@ -372,8 +372,8 @@
 }
 
 .btn-social:hover {
-    transform: scale(1.05);
-    opacity: 0.9;
+    transform: translateY(-3px); /* Move slightly upwards */
+    /* opacity: 0.9; Removed as per "not changing colours on hover" */
 }
 
 .btn-facebook {
