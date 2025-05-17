@@ -229,7 +229,7 @@
                                 <th>ID</th>
                                 <th>User Email</th>
                                 <th>Filename</th>
-                                <th>Upload Size (KB)</th>
+                                <th>Upload Size</th>
                                 <th>Slides</th>
                                 <th>Duration (s)</th>
                                 <th>Timestamp</th>
@@ -241,10 +241,16 @@
                                 <td>{{ stat.stat_id }}</td>
                                 <td>{{ stat.user_email }}</td>
                                 <td>{{ stat.original_filename }}</td>
-                                <td>{{ stat.upload_size_kb }}</td>
+                                <td>
+                                    {% if stat.upload_size_kb < 1024 %}
+                                        {{ "%.2f MB"|format(stat.upload_size_kb / 1024) }}
+                                    {% else %}
+                                        {{ stat.upload_size_kb }} KB
+                                    {% endif %}
+                                </td>
                                 <td>{{ stat.num_slides }}</td>
                                 <td>{{ "%.2f"|format(stat.conversion_duration_seconds) }}</td>
-                                <td>{{ stat.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                <td>{{ stat.created_at.strftime('%d-%m-%y (%H:%M)') }}</td>
                             </tr>
                             {% endfor %}
                         </tbody>
