@@ -391,7 +391,7 @@ async def cancel_subscription(request: Request, db: mysql.connector.connection.M
         cursor.close()
 
 @app.get("/admin", response_class=HTMLResponse)
-async def admin_dashboard(request: Request):
+async def admin_dashboard(request: Request, db: mysql.connector.connection.MySQLConnection = Depends(get_db)):
     """
     Admin dashboard with system monitoring and management tools.
     Only accessible to users with admin@slidepull.net email.
