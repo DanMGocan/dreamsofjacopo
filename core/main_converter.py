@@ -8,6 +8,8 @@ import time
 import asyncio
 import uuid
 from azure.storage.blob import BlobServiceClient
+from core.shared_state import conversion_progress
+
 from fastapi import HTTPException, Request, Depends
 import tempfile
 from database_op.database import get_db
@@ -280,27 +282,23 @@ async def convert_pptx_bytes_to_pdf(pptx_bytes, request: Request):
 # Dictionary to track conversion progress
 conversion_progress = {}
 
-async def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db):
+async def convert_pdf_to_slides_and_thumbnails(pdf_blob_name, user_alias, pdf_id, sas_token_pdf, db):
     """
-    Takes a PDF stored in Azure Blob Storage and converts each page to images and thumbnails.
+    Takes a PDF stored in Azure Blob Storage. For each page:
+    1. Extracts the page as a new 1-page PDF file.
+    2. Creates a smaller thumbnail image of the page.
+    3. Uploads both the 1-page PDF and the thumbnail image to Azure.
+    4. Stores references in the database:
+        - 1-page PDFs in 'slide_file' table (type='pdf').
+        - Thumbnails in 'thumbnail' table, linking to the 'slide_file' entry of the 1-page PDF.
     
-    This is the second step in our conversion pipeline. We:
-    1. Download the PDF from Azure
-    2. Convert each page to a high-quality image
-    3. Create a smaller thumbnail version of each image
-    4. Upload both to Azure and store references in the database
-    
-    The thumbnails are what users will see when selecting slides to include in a set.
-    
-    Progress is tracked and can be accessed via the conversion_progress dictionary.
-    
-    This function is now asynchronous and won't block other requests.
+    Progress is tracked.
     """
-    # Set up image quality - we use 2x scaling for high-res images
-    # This makes text crisp and readable even when zoomed in
-    zoom_x = 0.75 # 200% resolution horizontally
-    zoom_y = 0.75 # 200% resolution vertically
-    matrix = fitz.Matrix(zoom_x, zoom_y)  # PyMuPDF scaling matrix
+    # Thumbnail generation settings
+    thumbnail_zoom_x = 0.75 
+    thumbnail_zoom_y = 0.75 
+    thumbnail_matrix = fitz.Matrix(thumbnail_zoom_x, thumbnail_zoom_y)
+    thumbnail_width_target = 300 # Target width for thumbnail images
     
     # Initialize progress tracking
     str_pdf_id = str(pdf_id)
@@ -314,11 +312,11 @@ async def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf
     try:
         cursor = db.cursor(dictionary=True, buffered=True)
 
-        # Set up our file paths in Azure - we organize by user and presentation
-        image_blob_base = f"{user_alias}/images/{pdf_id}/slide_"
-        thumbnail_blob_base = f"{user_alias}/thumbnails/{pdf_id}/slide_"
+        # Azure Blob Storage paths
+        slide_pdf_blob_base = f"{user_alias}/slide_pdfs/{pdf_id}/slide_" # New path for 1-page PDFs
+        thumbnail_blob_base = f"{user_alias}/thumbnails/{pdf_id}/thumb_" # Path for thumbnails
 
-        # Build the URL to download the PDF from Azure
+        # Build the URL to download the main PDF from Azure
         pdf_blob_url = f"https://{AZURE_STORAGE_ACCOUNT_NAME}.blob.core.windows.net/{AZURE_BLOB_CONTAINER_NAME}/{pdf_blob_name}"
         pdf_blob_url_with_sas = f"{pdf_blob_url}?{sas_token_pdf}"
 
@@ -342,91 +340,82 @@ async def convert_pdf_to_images(pdf_blob_name, user_alias, pdf_id, sas_token_pdf
         # Update progress with total number of pages
         total_pages = len(pdf_document)
         conversion_progress[str_pdf_id]["total"] = total_pages
-        conversion_progress[str_pdf_id]["status"] = "processing"
-        logger.info(f"Processing {total_pages} pages from PDF")
+        conversion_progress[str_pdf_id]["status"] = "processing_slides"
+        logger.info(f"Processing {total_pages} pages from PDF {pdf_id} for user {user_alias}")
 
-        # We'll make thumbnails 300px wide - good balance of size and quality
-        thumbnail_width = 300
-
-        # Process each page of the PDF
         for page_number in range(total_pages):
-            # Update progress (using 1-based indexing for better user display)
             conversion_progress[str_pdf_id]["current"] = page_number + 1
-            
-            # Load the page and render it at high quality
             page = pdf_document.load_page(page_number)
-            pix = page.get_pixmap(matrix=matrix)
+
+            # 1. Create and store 1-page PDF for the current slide
+            slide_pdf_doc = fitz.open()  # New empty PDF
+            slide_pdf_doc.insert_pdf(pdf_document, from_page=page_number, to_page=page_number)
+            # Apply mediabox from original page to ensure consistent sizing
+            # slide_pdf_doc[0].set_mediabox(page.mediabox) # This might not be needed if insert_pdf handles it
+            slide_pdf_bytes = slide_pdf_doc.tobytes(garbage=4, deflate=True, clean=True) # Use maximum garbage collection
+            slide_pdf_doc.close()
             
-            # Convert the page to a PNG image
-            image_bytes = pix.tobytes("png")
-            
-            # Name the image file based on slide number
-            image_blob_name = f"{image_blob_base}{page_number + 1}.png"
-            
-            # Upload the full-size image to Azure asynchronously
-            # We'll use a thread pool for this since upload_to_blob is not async
-            image_url, sas_token_image, sas_token_expiry = await asyncio.get_event_loop().run_in_executor(
-                image_pool,
-                lambda: upload_to_blob(image_blob_name, image_bytes, "image/png", user_alias)
+            slide_pdf_blob_name = f"{slide_pdf_blob_base}{page_number + 1}.pdf"
+            slide_pdf_url, sas_token_slide_pdf, sas_token_slide_pdf_expiry = await asyncio.get_event_loop().run_in_executor(
+                image_pool, # Reusing image_pool for I/O bound tasks
+                lambda: upload_to_blob(slide_pdf_blob_name, slide_pdf_bytes, "application/pdf", user_alias)
             )
             
-            # Save the image info to our database
             cursor.execute(
-                "INSERT INTO image (pdf_id, url, sas_token, sas_token_expiry) VALUES (%s, %s, %s, %s)",
-                (pdf_id, image_url, sas_token_image, sas_token_expiry)
+                "INSERT INTO slide_file (pdf_id, url, sas_token, sas_token_expiry, file_type, slide_number) VALUES (%s, %s, %s, %s, 'pdf', %s)",
+                (pdf_id, slide_pdf_url, sas_token_slide_pdf, sas_token_slide_pdf_expiry, page_number + 1)
             )
-            image_id = cursor.lastrowid
+            slide_file_id_for_pdf = cursor.lastrowid # This ID represents the 1-page slide PDF
+
+            # 2. Create and store thumbnail for the current slide
+            # Generate pixmap for thumbnail
+            pix = page.get_pixmap(matrix=thumbnail_matrix) # Use the predefined thumbnail_matrix
             
-            # Now create a thumbnail version of the same image
-            # Calculate how much to scale down to get our target width
-            scale = thumbnail_width / pix.width
-            thumbnail_matrix = fitz.Matrix(scale, scale)
-            
-            # Generate the smaller thumbnail image
-            thumbnail_pix = page.get_pixmap(matrix=thumbnail_matrix)
+            # Scale to target width if necessary (PyMuPDF might not have a direct scale to width)
+            # Instead, create pixmap with good resolution and then resize if using PIL, or adjust zoom.
+            # For simplicity, using a fixed zoom for thumbnails for now.
+            # If pix.width > thumbnail_width_target:
+            #    scale_factor = thumbnail_width_target / pix.width
+            #    thumb_matrix_adjusted = fitz.Matrix(scale_factor, scale_factor)
+            #    thumbnail_pix = page.get_pixmap(matrix=thumb_matrix_adjusted)
+            # else:
+            #    thumbnail_pix = pix 
+            thumbnail_pix = page.get_pixmap(matrix=fitz.Matrix(thumbnail_width_target/page.rect.width, thumbnail_width_target/page.rect.width) if page.rect.width > 0 else thumbnail_matrix)
+
+
             thumbnail_bytes = thumbnail_pix.tobytes("png")
             
-            # Name and upload the thumbnail asynchronously
             thumbnail_blob_name = f"{thumbnail_blob_base}{page_number + 1}.png"
             thumbnail_url, sas_token_thumbnail, sas_token_thumbnail_expiry = await asyncio.get_event_loop().run_in_executor(
                 image_pool,
                 lambda: upload_to_blob(thumbnail_blob_name, thumbnail_bytes, "image/png", user_alias)
             )
             
-            # Save the thumbnail info to our database
+            # Insert into thumbnail table, linking to the slide_file_id of the 1-page PDF
             cursor.execute(
                 "INSERT INTO thumbnail (image_id, pdf_id, url, sas_token, sas_token_expiry) VALUES (%s, %s, %s, %s, %s)",
-                (image_id, pdf_id, thumbnail_url, sas_token_thumbnail, sas_token_thumbnail_expiry)
+                (slide_file_id_for_pdf, pdf_id, thumbnail_url, sas_token_thumbnail, sas_token_thumbnail_expiry)
             )
             
-            # Commit after each page to avoid losing work if there's an error
             db.commit()
-            
-            logger.info(f"Processed page {page_number + 1}/{total_pages}")
+            logger.info(f"Processed slide {page_number + 1}/{total_pages} for PDF {pdf_id}: 1-page PDF and thumbnail created.")
 
-        # Update progress to complete
-        conversion_progress[str_pdf_id]["current"] = total_pages
         conversion_progress[str_pdf_id]["status"] = "complete"
-        
-        # Clean up
         pdf_document.close()
-
-        # Return the total number of pages
         return total_pages
 
     except Exception as e:
-        # If anything goes wrong, undo any partial database changes
-        logger.error(f"Error converting PDF to images: {e}")
-        try:
-            db.rollback()
-        except Exception as rollback_err:
-            logger.error(f"Error during rollback: {rollback_err}")
+        logger.error(f"Error in convert_pdf_to_slides_and_thumbnails for PDF {pdf_id}: {e}")
+        if cursor: # Check if cursor was initialized
+            try:
+                db.rollback()
+            except Exception as rollback_err:
+                logger.error(f"Error during rollback for PDF {pdf_id}: {rollback_err}")
         
-        # Update progress with error
         if str_pdf_id in conversion_progress:
             conversion_progress[str_pdf_id]["status"] = "error"
             
-        raise Exception(f"Error converting PDF to images: {e}")
+        raise Exception(f"Error processing PDF slides and thumbnails for PDF {pdf_id}: {e}")
     finally:
         # Always close the database cursor
         if cursor:

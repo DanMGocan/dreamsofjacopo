@@ -3,6 +3,7 @@ from fastapi import FastAPI, UploadFile, File, Form, Request, Depends, WebSocket
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse
+from fastapi.concurrency import run_in_threadpool # Import for running sync code in thread pool
 from helpers.flash_utils import get_flash_message, set_flash_message
 from starlette.middleware.sessions import SessionMiddleware
 from dotenv import load_dotenv
@@ -404,10 +405,41 @@ async def admin_dashboard(request: Request):
         # Redirect non-admin users to the regular dashboard
         return RedirectResponse(url="/dashboard")
     
+    # Fetch conversion statistics
+    conversion_stats_data = []
+    try:
+        def sync_fetch_conversion_stats(conn: mysql.connector.connection.MySQLConnection):
+            # This function runs in a separate thread
+            _cursor = conn.cursor(dictionary=True)
+            _cursor.execute("""
+                SELECT 
+                    cs.stat_id,
+                    u.email as user_email,
+                    p.original_filename,
+                    cs.upload_size_kb,
+                    cs.num_slides,
+                    cs.conversion_duration_seconds,
+                    cs.created_at
+                FROM conversion_stats cs
+                JOIN user u ON cs.user_id = u.user_id
+                JOIN pdf p ON cs.pdf_id = p.pdf_id
+                ORDER BY cs.created_at DESC
+                LIMIT 50 
+            """) # Limit to last 50 for display
+            _data = _cursor.fetchall()
+            _cursor.close()
+            return _data
+
+        conversion_stats_data = await run_in_threadpool(sync_fetch_conversion_stats, db)
+    except Exception as e:
+        logging.error(f"Error fetching conversion stats for admin page: {e}")
+        # Continue without stats if there's an error
+
     # Render the admin template
     return templates.TemplateResponse("admin.html", {
         "request": request,
-        "email": request.session['email']
+        "email": request.session['email'],
+        "conversion_stats": conversion_stats_data
     })
 
 @app.get("/logs", response_class=HTMLResponse)

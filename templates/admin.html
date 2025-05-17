@@ -211,51 +211,54 @@
     </div>
 </div>
 
-<!-- System Health Section -->
+<!-- Conversion Statistics Section -->
 <div class="row mb-4">
     <div class="col-lg-12">
         <div class="card">
             <div class="card-header bg-white">
                 <h2 class="section-title h4 mb-0">
-                    <i class="fas fa-heartbeat me-2"></i> System Health
+                    <i class="fas fa-chart-line me-2"></i> Conversion Statistics
                 </h2>
             </div>
             <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6 mb-4">
-                        <div class="card h-100 border-0 shadow-sm">
-                            <div class="card-header bg-light-gray">
-                                <h3 class="h5 mb-0">System Uptime</h3>
-                            </div>
-                            <div class="card-body text-center">
-                                <div class="display-4 mb-3" id="uptimeDisplay">--:--:--</div>
-                                <p class="text-muted" id="uptimeInfo">Checking system uptime...</p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="col-md-6 mb-4">
-                        <div class="card h-100 border-0 shadow-sm">
-                            <div class="card-header bg-light-gray">
-                                <h3 class="h5 mb-0">System Actions</h3>
-                            </div>
-                            <div class="card-body">
-                                <div class="d-grid gap-2">
-                                    <button class="btn btn-warning" id="killLibreOfficeBtn">
-                                        <i class="fas fa-stop-circle me-1"></i> Kill All LibreOffice Processes
-                                    </button>
-                                    <button class="btn btn-danger" id="restartAppBtn">
-                                        <i class="fas fa-sync-alt me-1"></i> Restart Application
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                {% if conversion_stats %}
+                <div class="table-responsive">
+                    <table class="table table-hover table-sm">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>User Email</th>
+                                <th>Filename</th>
+                                <th>Upload Size (KB)</th>
+                                <th>Slides</th>
+                                <th>Duration (s)</th>
+                                <th>Timestamp</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for stat in conversion_stats %}
+                            <tr>
+                                <td>{{ stat.stat_id }}</td>
+                                <td>{{ stat.user_email }}</td>
+                                <td>{{ stat.original_filename }}</td>
+                                <td>{{ stat.upload_size_kb }}</td>
+                                <td>{{ stat.num_slides }}</td>
+                                <td>{{ "%.2f"|format(stat.conversion_duration_seconds) }}</td>
+                                <td>{{ stat.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
                 </div>
+                {% else %}
+                <p class="text-muted">No conversion statistics available yet.</p>
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
+
+<!-- System Health Section REMOVED -->
 
 <!-- Include Chart.js for gauges -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
