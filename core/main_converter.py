@@ -405,7 +405,8 @@ async def convert_pdf_to_slides_and_thumbnails(pdf_blob_name, user_alias, pdf_id
         return total_pages
 
     except Exception as e:
-        logger.error(f"Error in convert_pdf_to_slides_and_thumbnails for PDF {pdf_id}: {e}")
+        error_message = f"Error processing PDF slides and thumbnails for PDF {pdf_id}: {type(e).__name__} - {str(e)}"
+        logger.error(error_message)
         if cursor: # Check if cursor was initialized
             try:
                 db.rollback()
@@ -415,7 +416,7 @@ async def convert_pdf_to_slides_and_thumbnails(pdf_blob_name, user_alias, pdf_id
         if str_pdf_id in conversion_progress:
             conversion_progress[str_pdf_id]["status"] = "error"
             
-        raise Exception(f"Error processing PDF slides and thumbnails for PDF {pdf_id}: {e}")
+        raise Exception(error_message)
     finally:
         # Always close the database cursor
         if cursor:

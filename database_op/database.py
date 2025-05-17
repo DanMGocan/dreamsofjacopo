@@ -6,7 +6,7 @@ import logging
 import time
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+# logging.basicConfig(level=logging.INFO) # Removed: basicConfig is configured in app/main.py
 logger = logging.getLogger(__name__)
 
 # Load environment variables

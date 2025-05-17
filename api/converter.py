@@ -30,7 +30,7 @@ import uuid
 import time
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+# logging.basicConfig(level=logging.INFO) # Removed:basicConfig is configured in app/main.py
 logger = logging.getLogger(__name__)
 
 # Load our configuration from environment variables
@@ -216,6 +216,7 @@ async def upload_pptx(
 
         # Record conversion stats
         conversion_duration_seconds = time.time() - start_time_conversion
+        logger.info(f"Attempting to save conversion_stats for pdf_id: {pdf_id}, user_id: {user_id}, size: {file_size_kb}, slides: {num_slides}, duration: {conversion_duration_seconds}")
         stat_cursor = None # Use a new cursor variable for stats
         try:
             if not verify_db_connection(db):
@@ -223,6 +224,11 @@ async def upload_pptx(
                 db = get_connection() # Try to re-establish
             
             stat_cursor = db.cursor() # Initialize stat_cursor
+            # Ensure pdf_id and user_id are not None before executing
+            if pdf_id is None or user_id is None:
+                logger.error(f"Cannot save conversion_stats: pdf_id ({pdf_id}) or user_id ({user_id}) is None.")
+                raise ValueError("pdf_id or user_id is None, cannot insert conversion_stats.")
+
             stat_cursor.execute(
                 """
                 INSERT INTO conversion_stats (pdf_id, user_id, upload_size_kb, num_slides, conversion_duration_seconds)

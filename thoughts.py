@@ -15,6 +15,7 @@
 # Member since needs to be properly culled 
 ## Try and add Bootstrap and other dependencies locally, rather than CDN serving (Bootstrap, fonts)
 ## Disable developer mode in cloudflare before going live 
+# On presentation delete, do not hold the user on same page 
 
 
 ################ DONE ######################
