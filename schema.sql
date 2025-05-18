@@ -103,19 +103,19 @@ CREATE TABLE IF NOT EXISTS bug_reports (
 -- Conversion Stats Table - Stores statistics for each presentation conversion
 CREATE TABLE IF NOT EXISTS conversion_stats (
     stat_id INT AUTO_INCREMENT PRIMARY KEY,
-    pdf_id INT DEFAULT NULL,
-    user_id INT DEFAULT NULL,
+    user_email VARCHAR(255) DEFAULT NULL,
+    original_filename VARCHAR(255) DEFAULT NULL,
     upload_size_kb INT,
     num_slides INT,
     conversion_duration_seconds FLOAT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    -- No foreign keys for full persistence
+    -- This table is a simple log and not directly linked via foreign keys
 );
 
 -- Set Stats Table - Stores statistics for each set creation
 CREATE TABLE IF NOT EXISTS set_stats (
     stat_id INT AUTO_INCREMENT PRIMARY KEY,
-    set_id INT DEFAULT NULL,
+    set_id INT DEFAULT NULL, -- Kept for potential future reference, but not a strict FK
     num_slides_in_set INT,
     creation_duration_seconds FLOAT,
     set_size_kb INT,
@@ -134,6 +134,7 @@ CREATE INDEX idx_pdf_unique_code ON pdf(unique_code);
 CREATE INDEX idx_set_unique_code ON `set`(unique_code);
 CREATE INDEX idx_thumbnail_slide_file_id ON thumbnail(image_id);
 CREATE INDEX idx_user_id_set ON `set`(user_id);
-CREATE INDEX idx_conversion_stats_pdf_id ON conversion_stats(pdf_id);
-CREATE INDEX idx_conversion_stats_user_id ON conversion_stats(user_id);
-CREATE INDEX idx_set_stats_set_id ON set_stats(set_id);
+-- Removed indexes for pdf_id and user_id from conversion_stats as columns are removed
+-- CREATE INDEX idx_conversion_stats_pdf_id ON conversion_stats(pdf_id); -- Removed
+-- CREATE INDEX idx_conversion_stats_user_id ON conversion_stats(user_id); -- Removed
+CREATE INDEX idx_set_stats_set_id ON set_stats(set_id); -- Kept for set_stats

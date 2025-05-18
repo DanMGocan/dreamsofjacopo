@@ -216,30 +216,35 @@ async def upload_pptx(
 
         # Record conversion stats
         conversion_duration_seconds = time.time() - start_time_conversion
-        logger.info(f"Attempting to save conversion_stats for pdf_id: {pdf_id}, user_id: {user_id}, size: {file_size_kb}, slides: {num_slides}, duration: {conversion_duration_seconds}")
-        stat_cursor = None # Use a new cursor variable for stats
+        
+        # Prioritize email, fallback to alias for the stats record
+        identifier_for_stats = user_data.get('email')
+        if not identifier_for_stats:
+            identifier_for_stats = user_data.get('alias', 'unknown_user') # Fallback to alias, then to a placeholder
+        
+        logger.info(f"Attempting to save conversion_stats for identifier: {identifier_for_stats}, filename: {original_filename}, size: {file_size_kb}, slides: {num_slides}, duration: {conversion_duration_seconds}")
+        stat_cursor = None 
         try:
             if not verify_db_connection(db):
                 logger.error("DB connection lost before saving conversion_stats")
-                db = get_connection() # Try to re-establish
+                db = get_connection() 
             
-            stat_cursor = db.cursor() # Initialize stat_cursor
-            # Ensure pdf_id and user_id are not None before executing
-            if pdf_id is None or user_id is None:
-                logger.error(f"Cannot save conversion_stats: pdf_id ({pdf_id}) or user_id ({user_id}) is None.")
-                raise ValueError("pdf_id or user_id is None, cannot insert conversion_stats.")
-
-            stat_cursor.execute(
-                """
-                INSERT INTO conversion_stats (pdf_id, user_id, upload_size_kb, num_slides, conversion_duration_seconds)
-                VALUES (%s, %s, %s, %s, %s)
-                """,
-                (pdf_id, user_id, file_size_kb, num_slides, conversion_duration_seconds)
-            )
-            db.commit()
-            logger.info(f"Conversion stats saved for pdf_id {pdf_id}. Duration: {conversion_duration_seconds:.2f}s")
+            stat_cursor = db.cursor() 
+            
+            if original_filename is None: # Email/Alias has a fallback, so only check filename
+                logger.error(f"Cannot save conversion_stats: original_filename ({original_filename}) is None.")
+            else:
+                stat_cursor.execute(
+                    """
+                    INSERT INTO conversion_stats (user_email, original_filename, upload_size_kb, num_slides, conversion_duration_seconds)
+                    VALUES (%s, %s, %s, %s, %s)
+                    """,
+                    (identifier_for_stats, original_filename, file_size_kb, num_slides, conversion_duration_seconds)
+                )
+                db.commit()
+                logger.info(f"Conversion stats saved for {original_filename} by {identifier_for_stats}. Duration: {conversion_duration_seconds:.2f}s")
         except Exception as stat_err:
-            logger.error(f"Error saving conversion_stats for pdf_id {pdf_id}: {stat_err}")
+            logger.error(f"Error saving conversion_stats for {original_filename} by {identifier_for_stats}: {stat_err}")
             # Do not fail the whole request if stats saving fails, just log it.
         finally:
             if stat_cursor: # Check if stat_cursor was initialized

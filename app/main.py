@@ -413,17 +413,15 @@ async def admin_dashboard(request: Request, db: mysql.connector.connection.MySQL
             _cursor = conn.cursor(dictionary=True)
             _cursor.execute("""
                 SELECT 
-                    cs.stat_id,
-                    u.email as user_email,
-                    p.original_filename,
-                    cs.upload_size_kb,
-                    cs.num_slides,
-                    cs.conversion_duration_seconds,
-                    cs.created_at
-                FROM conversion_stats cs
-                JOIN user u ON cs.user_id = u.user_id
-                JOIN pdf p ON cs.pdf_id = p.pdf_id
-                ORDER BY cs.created_at DESC
+                    stat_id,
+                    user_email,
+                    original_filename,
+                    upload_size_kb,
+                    num_slides,
+                    conversion_duration_seconds,
+                    created_at
+                FROM conversion_stats
+                ORDER BY created_at DESC
                 LIMIT 50 
             """) # Limit to last 50 for display
             _data = _cursor.fetchall()
