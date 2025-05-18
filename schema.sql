@@ -104,13 +104,12 @@ CREATE TABLE IF NOT EXISTS bug_reports (
 CREATE TABLE IF NOT EXISTS conversion_stats (
     stat_id INT AUTO_INCREMENT PRIMARY KEY,
     pdf_id INT DEFAULT NULL,
-    user_id INT NOT NULL,
+    user_id INT DEFAULT NULL,
     upload_size_kb INT,
     num_slides INT,
     conversion_duration_seconds FLOAT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (pdf_id) REFERENCES pdf(pdf_id) ON DELETE SET NULL,
-    FOREIGN KEY (user_id) REFERENCES user(user_id) ON DELETE CASCADE
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    -- No foreign keys for full persistence
 );
 
 -- Set Stats Table - Stores statistics for each set creation
@@ -120,8 +119,8 @@ CREATE TABLE IF NOT EXISTS set_stats (
     num_slides_in_set INT,
     creation_duration_seconds FLOAT,
     set_size_kb INT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (set_id) REFERENCES `set`(set_id) ON DELETE SET NULL
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    -- No foreign key for full persistence
 );
 
 -- Create indexes for performance optimization
